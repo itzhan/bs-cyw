@@ -1,0 +1,14 @@
+.git
+.gitignore
+.DS_Store
+*.docx
+*.doc
+*.md
+backend/swim-admin/target
+node_modules
+.idea
+.vscode
+*.iml
+/tmp
+.gemini
+.agents

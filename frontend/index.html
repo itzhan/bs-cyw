@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>城市智慧路灯管理信息系统</title>
+    <meta name="description" content="城市智慧路灯管理信息系统 - 前端WEB页面">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <script>
+        // 根据登录状态跳转
+        if (localStorage.getItem('token')) {
+            window.location.href = 'pages/dashboard.html';
+        } else {
+            window.location.href = 'pages/login.html';
+        }
+    </script>
+</body>
+</html>

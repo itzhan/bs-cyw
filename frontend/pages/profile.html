@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人中心 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">个人中心</h2>
+            
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header"><h3>个人信息</h3></div>
+        <div class="card-body">
+            <form id="profileForm">
+                <div class="form-group"><label class="form-label">用户名</label><input class="form-input" id="pUsername" disabled></div>
+                <div class="form-group"><label class="form-label">真实姓名</label><input class="form-input" id="pRealName"></div>
+                <div class="form-group"><label class="form-label">手机号</label><input class="form-input" id="pPhone"></div>
+                <div class="form-group"><label class="form-label">邮箱</label><input class="form-input" id="pEmail"></div>
+                <button type="submit" class="btn btn-primary">保存修改</button>
+            </form>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3>修改密码</h3></div>
+        <div class="card-body">
+            <form id="passwordForm">
+                <div class="form-group"><label class="form-label">旧密码</label><input class="form-input" type="password" id="oldPwd" required></div>
+                <div class="form-group"><label class="form-label">新密码</label><input class="form-input" type="password" id="newPwd" required minlength="6"></div>
+                <div class="form-group"><label class="form-label">确认新密码</label><input class="form-input" type="password" id="confirmPwd" required></div>
+                <button type="submit" class="btn btn-primary">修改密码</button>
+            </form>
+        </div>
+    </div>
+</div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('profile','个人中心'))throw'';</script>
+<script>
+async function loadProfile(){try{const res=await authApi.getInfo();const u=res.data;
+document.getElementById('pUsername').value=u.username;document.getElementById('pRealName').value=u.realName||'';
+document.getElementById('pPhone').value=u.phone||'';document.getElementById('pEmail').value=u.email||'';
+}catch(err){showToast(err.message,'error');}}
+document.getElementById('profileForm').addEventListener('submit',async(e)=>{e.preventDefault();try{
+await authApi.updateProfile({realName:document.getElementById('pRealName').value,phone:document.getElementById('pPhone').value,email:document.getElementById('pEmail').value});
+showToast('个人信息更新成功','success');const user=getUser();if(user){user.realName=document.getElementById('pRealName').value;localStorage.setItem('user',JSON.stringify(user));}
+}catch(err){showToast(err.message,'error');}});
+document.getElementById('passwordForm').addEventListener('submit',async(e)=>{e.preventDefault();
+if(document.getElementById('newPwd').value!==document.getElementById('confirmPwd').value){showToast('两次密码不一致','error');return;}
+try{await authApi.changePassword({oldPassword:document.getElementById('oldPwd').value,newPassword:document.getElementById('newPwd').value});
+showToast('密码修改成功，请重新登录','success');setTimeout(()=>logout(),1500);}catch(err){showToast(err.message,'error');}});
+loadProfile();
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>告警中心 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">告警中心</h2>
+            
+<div class="card">
+    <div class="card-header"><h3>告警信息</h3></div>
+    <div class="card-body">
+        <div class="search-bar">
+            <select class="form-select" id="filterType" style="width:120px" onchange="loadAlarms()">
+                <option value="">全部类型</option>
+                <option value="1">灯具故障</option><option value="2">电压异常</option>
+                <option value="3">电流异常</option><option value="4">通信故障</option>
+                <option value="5">线缆异常</option><option value="6">其他</option>
+            </select>
+            <select class="form-select" id="filterLevel" style="width:110px" onchange="loadAlarms()">
+                <option value="">全部级别</option>
+                <option value="1">低</option><option value="2">中</option>
+                <option value="3">高</option><option value="4">紧急</option>
+            </select>
+            <select class="form-select" id="filterStatus" style="width:120px" onchange="loadAlarms()">
+                <option value="">全部状态</option>
+                <option value="0">未处理</option><option value="1">处理中</option>
+                <option value="2">已处理</option><option value="3">已忽略</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="loadAlarms()">查询</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr><th>告警编码</th><th>标题</th><th>类型</th><th>级别</th><th>状态</th><th>告警时间</th><th>操作</th></tr></thead>
+                <tbody id="alarmTableBody"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+            </table>
+        </div>
+        <div id="pagination"></div>
+    </div>
+</div>
+<div class="modal-overlay" id="handleModal">
+    <div class="modal">
+        <div class="modal-header"><h3>处理告警</h3><button class="modal-close" onclick="closeModal('handleModal')">✕</button></div>
+        <div class="modal-body">
+            <input type="hidden" id="handleId">
+            <div class="form-group"><label class="form-label">处理状态</label>
+                <select class="form-select" id="handleStatus"><option value="1">处理中</option><option value="2">已处理</option><option value="3">忽略</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">处理备注</label><textarea class="form-textarea" id="handleRemark" placeholder="请输入处理说明"></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('handleModal')">取消</button><button class="btn btn-primary" onclick="submitHandle()">确认</button></div>
+    </div>
+</div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('alarm','告警中心'))throw'';</script>
+<script>
+let currentPage=1;
+async function loadAlarms(page){
+    currentPage=page||1;
+    try{
+        const res=await alarmApi.list({page:currentPage,size:10,type:document.getElementById('filterType').value,level:document.getElementById('filterLevel').value,status:document.getElementById('filterStatus').value});
+        const d=res.data;
+        document.getElementById('alarmTableBody').innerHTML=d.records.map(a=>`
+            <tr>
+                <td><code>${a.alarmCode}</code></td><td>${a.title}</td>
+                <td>${STATUS_MAP.alarmType[a.type]||a.type}</td>
+                <td>${statusTag('alarmLevel',a.level)}</td>
+                <td>${statusTag('alarmStatus',a.status)}</td>
+                <td>${formatDateTime(a.alarmTime)}</td>
+                <td>${a.status<2?`<button class="btn btn-warning btn-sm" onclick="openHandle(${a.id})">处理</button>`:'-'}</td>
+            </tr>
+        `).join('')||'<tr><td colspan="7" class="text-center text-muted">暂无告警</td></tr>';
+        renderPagination('pagination',d.total,d.page,d.size,loadAlarms);
+    }catch(err){showToast(err.message,'error');}
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function openHandle(id){document.getElementById('handleId').value=id;document.getElementById('handleModal').classList.add('show');}
+async function submitHandle(){
+    try{
+        await alarmApi.handle(document.getElementById('handleId').value,{status:parseInt(document.getElementById('handleStatus').value),handleRemark:document.getElementById('handleRemark').value});
+        showToast('处理成功','success');closeModal('handleModal');loadAlarms(currentPage);
+    }catch(err){showToast(err.message,'error');}
+}
+loadAlarms();
+</script>
+</body>
+</html>

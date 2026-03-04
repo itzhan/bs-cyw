@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>报修申请 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">报修申请</h2>
+            
+<div class="card mb-24">
+    <div class="card-header"><h3>我的报修</h3><button class="btn btn-primary btn-sm" onclick="openReport()">+ 提交报修</button></div>
+    <div class="card-body">
+        <div class="table-container"><table class="data-table"><thead><tr><th>报修号</th><th>地址</th><th>描述</th><th>状态</th><th>回复</th><th>提交时间</th></tr></thead>
+        <tbody id="myReportBody"><tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
+    </div>
+</div>
+<div class="modal-overlay" id="reportModal"><div class="modal" style="max-width:560px">
+    <div class="modal-header"><h3>提交报修</h3><button class="modal-close" onclick="closeModal('reportModal')">✕</button></div>
+    <div class="modal-body">
+        <div class="form-group"><label class="form-label">故障地址</label><input class="form-input" id="rAddress" placeholder="请输入故障所在位置" required></div>
+        <div class="form-group"><label class="form-label">问题描述</label><textarea class="form-textarea" id="rDesc" placeholder="请详细描述故障情况" required></textarea></div>
+        <div class="grid-2">
+            <div class="form-group"><label class="form-label">联系人</label><input class="form-input" id="rName"></div>
+            <div class="form-group"><label class="form-label">联系电话</label><input class="form-input" id="rPhone"></div>
+        </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('reportModal')">取消</button><button class="btn btn-primary" onclick="submitReport()">提交</button></div>
+</div></div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('repair','报修申请'))throw'';</script>
+<script>
+async function loadMyReports(){try{const res=await repairApi.my({page:1,size:20});
+document.getElementById('myReportBody').innerHTML=(res.data.records||[]).map(r=>`<tr><td><code>${r.reportNo}</code></td><td>${r.address||'-'}</td><td>${(r.description||'').substring(0,30)}</td><td>${statusTag('repairStatus',r.status)}</td><td>${r.reply||'-'}</td><td>${formatDateTime(r.createdAt)}</td></tr>`).join('')||'<tr><td colspan="6" class="text-center text-muted">暂无报修记录</td></tr>';}catch(err){showToast(err.message,'error');}}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function openReport(){document.getElementById('reportModal').classList.add('show');}
+async function submitReport(){try{await repairApi.create({address:document.getElementById('rAddress').value,description:document.getElementById('rDesc').value,reporterName:document.getElementById('rName').value,reporterPhone:document.getElementById('rPhone').value});showToast('报修提交成功','success');closeModal('reportModal');loadMyReports();}catch(err){showToast(err.message,'error');}}
+loadMyReports();
+</script>
+</body>
+</html>

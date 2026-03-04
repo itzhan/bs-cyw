@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户管理 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">用户管理</h2>
+            
+<div class="card">
+    <div class="card-header"><h3>用户管理</h3></div>
+    <div class="card-body">
+        <div class="search-bar"><div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="searchInput" placeholder="搜索用户..." onkeyup="if(event.key==='Enter')loadUsers()"></div><button class="btn btn-primary btn-sm" onclick="loadUsers()">查询</button></div>
+        <div class="table-container"><table class="data-table"><thead><tr><th>ID</th><th>用户名</th><th>姓名</th><th>手机</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
+        <tbody id="userTableBody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
+        <div id="pagination"></div>
+    </div>
+</div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('users','用户管理'))throw'';</script>
+<script>
+let currentPage=1;
+async function loadUsers(page){currentPage=page||1;try{const res=await userApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value});const d=res.data;
+document.getElementById('userTableBody').innerHTML=d.records.map(u=>`<tr><td>${u.id}</td><td>${u.username}</td><td>${u.realName||'-'}</td><td>${u.phone||'-'}</td><td>${(u.roles||[]).map(r=>r.description||r.name).join(', ')}</td><td>${u.status===1?'<span class="tag tag-success">启用</span>':'<span class="tag tag-default">禁用</span>'}</td><td>${formatDateTime(u.lastLoginTime)}</td><td><button class="btn btn-outline btn-sm" onclick="resetPwd(${u.id})">重置密码</button></td></tr>`).join('');
+renderPagination('pagination',d.total,d.page,d.size,loadUsers);}catch(err){showToast(err.message,'error');}}
+async function resetPwd(id){if(!confirm('确定重置该用户密码为123456?'))return;try{await userApi.resetPassword(id);showToast('密码已重置为123456','success');}catch(err){showToast(err.message,'error');}}
+loadUsers();
+</script>
+</body>
+</html>

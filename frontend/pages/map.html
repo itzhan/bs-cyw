@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设备地图 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .map-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .map-stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            border: 1px solid var(--border-light);
+            box-shadow: var(--shadow-sm);
+            font-size: 13px;
+        }
+        .map-stat-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .map-stat-item strong {
+            font-size: 18px;
+            margin-left: 4px;
+        }
+        .map-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .map-card {
+            height: calc(100vh - 220px);
+            min-height: 500px;
+        }
+        .map-card .card-body {
+            padding: 0;
+            height: calc(100% - 52px);
+        }
+        #mapContainer {
+            width: 100%;
+            height: 100%;
+            border-radius: 0 0 12px 12px;
+        }
+        /* AMap info window custom style */
+        .amap-info-window {
+            font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+        .map-popup {
+            min-width: 260px;
+            padding: 16px;
+        }
+        .map-popup-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1E293B;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .map-popup-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 12.5px;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+        .map-popup-row:last-child { border-bottom: none; }
+        .map-popup-label {
+            color: #64748B;
+        }
+        .map-popup-value {
+            color: #1E293B;
+            font-weight: 500;
+        }
+        .map-legend {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">设备地图</h2>
+
+            <!-- Statistics Bar -->
+            <div class="map-stats" id="mapStats">
+                <div class="map-stat-item">
+                    <div class="map-stat-dot" style="background:var(--primary)"></div>
+                    <span>设备总数</span><strong id="statTotal">-</strong>
+                </div>
+                <div class="map-stat-item">
+                    <div class="map-stat-dot" style="background:var(--success)"></div>
+                    <span>在线正常</span><strong id="statOnline">-</strong>
+                </div>
+                <div class="map-stat-item">
+                    <div class="map-stat-dot" style="background:var(--danger)"></div>
+                    <span>故障</span><strong id="statFault">-</strong>
+                </div>
+                <div class="map-stat-item">
+                    <div class="map-stat-dot" style="background:var(--text-muted)"></div>
+                    <span>离线</span><strong id="statOffline">-</strong>
+                </div>
+                <div class="map-stat-item">
+                    <div class="map-stat-dot" style="background:var(--warning)"></div>
+                    <span>维护中</span><strong id="statMaint">-</strong>
+                </div>
+            </div>
+
+            <!-- Map Card -->
+            <div class="card map-card">
+                <div class="card-header">
+                    <h3><i data-lucide="map" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>设备地图监控</h3>
+                    <div class="map-toolbar">
+                        <div class="map-legend">
+                            <div class="legend-item"><div class="legend-dot" style="background:#10B981"></div>在线正常</div>
+                            <div class="legend-item"><div class="legend-dot" style="background:#EF4444"></div>故障</div>
+                            <div class="legend-item"><div class="legend-dot" style="background:#94A3B8"></div>离线</div>
+                            <div class="legend-item"><div class="legend-dot" style="background:#F59E0B"></div>维护中</div>
+                        </div>
+                        <select class="form-select" style="width:130px;padding:6px 10px;font-size:12px" id="filterStatus" onchange="filterMarkers()">
+                            <option value="all">全部状态</option>
+                            <option value="online">在线正常</option>
+                            <option value="fault">故障</option>
+                            <option value="offline">离线</option>
+                            <option value="maintain">维护中</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="mapContainer"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- AMap JS API v2 with security key -->
+<script>
+    window._AMapSecurityConfig = {
+        securityJsCode: '829df186fd14a91f24aa94f21b6b9964'
+    };
+</script>
+<script src="https://webapi.amap.com/maps?v=2.0&key=233f28b114cbe6fde30008428445f96f&plugin=AMap.Scale,AMap.ToolBar"></script>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('map','设备地图'))throw'';</script>
+<script>
+(function() {
+    // Global state
+    var map = null;
+    var markers = [];
+    var allLights = [];
+    var infoWindow = null;
+
+    // Color mapping for device status
+    var STATUS_COLORS = {
+        0: '#EF4444',  // Fault - red
+        1: '#10B981',  // Normal - green
+        2: '#F59E0B',  // Maintenance - yellow
+        3: '#94A3B8'   // Decommissioned - gray
+    };
+
+    var DEVICE_STATUS_TEXT = {
+        0: '故障', 1: '正常', 2: '维护中', 3: '报废'
+    };
+
+    // Build info window content
+    function buildInfoContent(light) {
+        var statusColor = STATUS_COLORS[light.deviceStatus] || '#94A3B8';
+        var statusText = DEVICE_STATUS_TEXT[light.deviceStatus] || '未知';
+        var onlineText = light.onlineStatus === 1 ? '在线' : '离线';
+        var onlineColor = light.onlineStatus === 1 ? '#10B981' : '#94A3B8';
+        var lightText = light.lightStatus === 1 ? '亮灯' : '关灯';
+        var lightColor = light.lightStatus === 1 ? '#F59E0B' : '#64748B';
+
+        return '<div class="map-popup">' +
+            '<div class="map-popup-title">' +
+                '<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + statusColor + '"></span> ' +
+                light.code + ' · ' + light.name +
+            '</div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">设备状态</span><span class="map-popup-value" style="color:' + statusColor + '">' + statusText + '</span></div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">网络状态</span><span class="map-popup-value" style="color:' + onlineColor + '">' + onlineText + '</span></div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">灯光状态</span><span class="map-popup-value" style="color:' + lightColor + '">' + lightText + '</span></div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">亮度</span><span class="map-popup-value">' + (light.brightness || 0) + '%</span></div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">功率</span><span class="map-popup-value">' + (light.power || '-') + ' W</span></div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">灯型</span><span class="map-popup-value">' + (light.lampType || '-') + '</span></div>' +
+            '<div class="map-popup-row"><span class="map-popup-label">地址</span><span class="map-popup-value">' + (light.address || '-') + '</span></div>' +
+            (light.longitude ? '<div class="map-popup-row"><span class="map-popup-label">经纬度</span><span class="map-popup-value">' + Number(light.longitude).toFixed(5) + ', ' + Number(light.latitude).toFixed(5) + '</span></div>' : '') +
+        '</div>';
+    }
+
+    // Add markers to map using CircleMarker
+    function addMarkers(lights) {
+        // Clear existing markers
+        if (markers.length) {
+            map.remove(markers);
+            markers = [];
+        }
+
+        for (var i = 0; i < lights.length; i++) {
+            var light = lights[i];
+            if (!light.longitude || !light.latitude) continue;
+
+            var color = STATUS_COLORS[light.deviceStatus] || '#94A3B8';
+            if (light.onlineStatus === 0) color = '#94A3B8';
+
+            var isLit = light.lightStatus === 1 && light.onlineStatus === 1;
+            var radius = isLit ? 10 : 7;
+
+            var circleMarker = new AMap.CircleMarker({
+                center: new AMap.LngLat(Number(light.longitude), Number(light.latitude)),
+                radius: radius,
+                strokeColor: color,
+                strokeWeight: 2,
+                strokeOpacity: 0.8,
+                fillColor: color,
+                fillOpacity: isLit ? 0.6 : 0.4,
+                zIndex: light.deviceStatus === 0 ? 20 : 10,
+                cursor: 'pointer',
+                bubble: false
+            });
+
+            // Use closure to capture light
+            (function(l, cm) {
+                cm.on('click', function() {
+                    infoWindow.setContent(buildInfoContent(l));
+                    infoWindow.open(map, new AMap.LngLat(Number(l.longitude), Number(l.latitude)));
+                });
+            })(light, circleMarker);
+
+            markers.push(circleMarker);
+        }
+
+        map.add(markers);
+        console.log('[Map] Added ' + markers.length + ' circle markers');
+    }
+
+    // Filter markers
+    window.filterMarkers = function() {
+        var filter = document.getElementById('filterStatus').value;
+        var filtered = allLights;
+
+        if (filter === 'online') filtered = allLights.filter(function(l) { return l.onlineStatus === 1 && l.deviceStatus === 1; });
+        else if (filter === 'fault') filtered = allLights.filter(function(l) { return l.deviceStatus === 0; });
+        else if (filter === 'offline') filtered = allLights.filter(function(l) { return l.onlineStatus === 0; });
+        else if (filter === 'maintain') filtered = allLights.filter(function(l) { return l.deviceStatus === 2; });
+
+        addMarkers(filtered);
+        if (markers.length > 0) map.setFitView(markers, false, [60, 60, 60, 60]);
+    };
+
+    // Update statistics
+    function updateStats(lights) {
+        document.getElementById('statTotal').textContent = lights.length;
+        document.getElementById('statOnline').textContent = lights.filter(function(l) { return l.onlineStatus === 1 && l.deviceStatus === 1; }).length;
+        document.getElementById('statFault').textContent = lights.filter(function(l) { return l.deviceStatus === 0; }).length;
+        document.getElementById('statOffline').textContent = lights.filter(function(l) { return l.onlineStatus === 0; }).length;
+        document.getElementById('statMaint').textContent = lights.filter(function(l) { return l.deviceStatus === 2; }).length;
+    }
+
+    // Load devices and add to map
+    function loadDevices() {
+        lightApi.all().then(function(res) {
+            allLights = res.data || [];
+            console.log('[Map] Loaded ' + allLights.length + ' devices');
+
+            if (allLights.length > 0) {
+                var f = allLights[0];
+                console.log('[Map] Sample:', f.code, f.longitude, f.latitude);
+            }
+
+            updateStats(allLights);
+            addMarkers(allLights);
+
+            if (markers.length > 0) {
+                map.setFitView(markers, false, [60, 60, 60, 60]);
+            }
+        }).catch(function(err) {
+            console.error('[Map] Load error:', err);
+            showToast('设备数据加载失败: ' + err.message, 'error');
+        });
+    }
+
+    // Initialize
+    console.log('[Map] Initializing AMap...');
+    console.log('[Map] AMap available:', typeof AMap !== 'undefined');
+
+    map = new AMap.Map('mapContainer', {
+        zoom: 13,
+        center: [113.665, 34.757],
+        mapStyle: 'amap://styles/whitesmoke',
+        features: ['bg', 'road', 'building', 'point'],
+        resizeEnable: true
+    });
+
+    infoWindow = new AMap.InfoWindow({
+        isCustom: false,
+        autoMove: true,
+        offset: new AMap.Pixel(0, -5)
+    });
+
+    map.addControl(new AMap.Scale());
+    map.addControl(new AMap.ToolBar({ position: 'RT' }));
+
+    // Wait for map to be fully ready, then load devices
+    map.on('complete', function() {
+        console.log('[Map] Map loaded complete, fetching devices...');
+        loadDevices();
+    });
+
+})();
+</script>
+</body>
+</html>

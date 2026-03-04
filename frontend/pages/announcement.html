@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统公告 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">系统公告</h2>
+            
+<div class="card">
+    <div class="card-header"><h3>系统公告</h3></div>
+    <div class="card-body" id="announceContent"><div class="loading"><div class="spinner"></div></div></div>
+</div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('announcement','系统公告'))throw'';</script>
+<script>
+async function loadAnnouncements(){try{const res=await announceApi.published();
+document.getElementById('announceContent').innerHTML=res.data.map(a=>`
+    <div style="padding:16px 0;border-bottom:1px solid var(--border-light)">
+        <div class="flex items-center gap-8 mb-16">
+            ${a.topFlag===1?'<span class="tag tag-danger" style="font-size:10px">置顶</span>':''}
+            <h3 style="font-size:15px">${a.title}</h3>
+            <span class="tag ${['','tag-info','tag-warning','tag-success'][a.type]||'tag-default'}" style="font-size:11px">${STATUS_MAP.announcementType[a.type]||''}</span>
+        </div>
+        <p style="font-size:13px;color:var(--text-secondary);line-height:1.8">${a.content||''}</p>
+        <div class="text-muted" style="margin-top:8px;font-size:12px">发布时间：${formatDateTime(a.publishTime)}</div>
+    </div>`).join('')||'<div class="empty-state"><p>暂无公告</p></div>';
+}catch(err){showToast(err.message,'error');}}
+loadAnnouncements();
+</script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>策略管理 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">策略管理</h2>
+            
+<div class="card">
+    <div class="card-header"><h3>控制策略</h3><button class="btn btn-primary btn-sm" onclick="openCreate()" id="createBtn">+ 新建策略</button></div>
+    <div class="card-body">
+        <div class="search-bar">
+            <select class="form-select" id="filterType" style="width:120px" onchange="loadStrategies()"><option value="">全部类型</option><option value="1">定时策略</option><option value="2">光控策略</option><option value="3">节假日策略</option><option value="4">人流策略</option></select>
+            <select class="form-select" id="filterStatus" style="width:120px" onchange="loadStrategies()"><option value="">全部状态</option><option value="1">启用</option><option value="0">禁用</option></select>
+        </div>
+        <div class="table-container"><table class="data-table"><thead><tr><th>名称</th><th>类型</th><th>开灯</th><th>关灯</th><th>亮度</th><th>有效期</th><th>优先级</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="tableBody"><tr><td colspan="9"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
+        <div id="pagination"></div>
+    </div>
+</div>
+<div class="modal-overlay" id="createModal"><div class="modal" style="max-width:600px">
+    <div class="modal-header"><h3>新建策略</h3><button class="modal-close" onclick="closeModal('createModal')">✕</button></div>
+    <div class="modal-body">
+        <div class="form-group"><label class="form-label">策略名称</label><input class="form-input" id="csName" required></div>
+        <div class="grid-2">
+            <div class="form-group"><label class="form-label">类型</label><select class="form-select" id="csType"><option value="1">定时策略</option><option value="2">光控策略</option><option value="3">节假日策略</option><option value="4">人流策略</option></select></div>
+            <div class="form-group"><label class="form-label">优先级</label><input class="form-input" id="csPriority" type="number" value="5"></div>
+        </div>
+        <div class="grid-2">
+            <div class="form-group"><label class="form-label">开灯时间</label><input class="form-input" id="csStart" type="time"></div>
+            <div class="form-group"><label class="form-label">关灯时间</label><input class="form-input" id="csEnd" type="time"></div>
+        </div>
+        <div class="form-group"><label class="form-label">亮度(%)</label><input class="form-input" id="csBrightness" type="number" min="0" max="100" value="100"></div>
+        <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="csDesc"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('createModal')">取消</button><button class="btn btn-primary" onclick="submitCreate()">保存</button></div>
+</div></div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('strategy','策略管理'))throw'';</script>
+<script>
+let currentPage=1;
+async function loadStrategies(page){currentPage=page||1;try{
+const res=await strategyApi.list({page:currentPage,size:10,type:document.getElementById('filterType').value,status:document.getElementById('filterStatus').value});const d=res.data;
+document.getElementById('tableBody').innerHTML=d.records.map(s=>`<tr><td>${s.name}</td><td>${STATUS_MAP.strategyType[s.type]||s.type}</td><td>${s.startTime||'-'}</td><td>${s.endTime||'-'}</td><td>${s.brightness!=null?s.brightness+'%':'-'}</td><td>${s.effectiveStart||'-'} ~ ${s.effectiveEnd||'-'}</td><td>${s.priority}</td><td><span class="tag ${s.status===1?'tag-success':'tag-default'}">${s.status===1?'启用':'禁用'}</span></td><td><button class="btn btn-sm ${s.status===1?'btn-warning':'btn-success'}" onclick="toggleStrategy(${s.id})">${s.status===1?'禁用':'启用'}</button></td></tr>`).join('');
+renderPagination('pagination',d.total,d.page,d.size,loadStrategies);}catch(err){showToast(err.message,'error');}}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function openCreate(){document.getElementById('createModal').classList.add('show');}
+async function toggleStrategy(id){try{await strategyApi.toggle(id);showToast('操作成功','success');loadStrategies(currentPage);}catch(err){showToast(err.message,'error');}}
+async function submitCreate(){try{await strategyApi.create({name:document.getElementById('csName').value,type:parseInt(document.getElementById('csType').value),startTime:document.getElementById('csStart').value||null,endTime:document.getElementById('csEnd').value||null,brightness:parseInt(document.getElementById('csBrightness').value),priority:parseInt(document.getElementById('csPriority').value),description:document.getElementById('csDesc').value,status:1});showToast('创建成功','success');closeModal('createModal');loadStrategies();}catch(err){showToast(err.message,'error');}}
+loadStrategies();
+</script>
+</body>
+</html>

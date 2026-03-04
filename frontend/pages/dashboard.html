@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仪表盘 - 城市智慧路灯管理系统</title>
+    <meta name="description" content="城市智慧路灯管理系统总览仪表盘，展示路灯在线率、亮灯率、能耗、告警统计">
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">系统总览</h2>
+
+            <!-- 统计卡片 -->
+            <div class="stat-grid" id="statCards">
+                <div class="stat-card"><div class="loading"><div class="spinner"></div></div></div>
+            </div>
+
+            <!-- 图表区 -->
+            <div class="charts-grid">
+                <div class="card">
+                    <div class="card-header"><h3><i data-lucide="bar-chart-3" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>近30天能耗趋势</h3></div>
+                    <div class="card-body"><div id="energyChart" style="height:320px"></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3><i data-lucide="bell-ring" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>告警类型分布</h3></div>
+                    <div class="card-body"><div id="alarmChart" style="height:320px"></div></div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="card">
+                    <div class="card-header"><h3><i data-lucide="lightbulb" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>设备类型统计</h3></div>
+                    <div class="card-body"><div id="deviceChart" style="height:300px"></div></div>
+                </div>
+                <div class="card">
+                    <div class="card-header"><h3><i data-lucide="megaphone" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>最新公告</h3></div>
+                    <div class="card-body" id="announceList">
+                        <div class="loading"><div class="spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>
+    if (!initPage('dashboard', '仪表盘')) throw '';
+
+    // 加载总览数据
+    async function loadOverview() {
+        try {
+            const res = await statsApi.overview();
+            const d = res.data;
+            document.getElementById('statCards').innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-icon primary"><i data-lucide="lightbulb"></i></div>
+                    <div class="stat-info">
+                        <h4>路灯总数</h4>
+                        <div class="stat-value">${d.totalLights}</div>
+                        <div class="stat-sub">电柜 ${d.totalCabinets} 台</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon success"><i data-lucide="wifi"></i></div>
+                    <div class="stat-info">
+                        <h4>在线率</h4>
+                        <div class="stat-value">${d.onlineRate}%</div>
+                        <div class="stat-sub">在线 ${d.onlineCount} 盏</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon warning"><i data-lucide="sun"></i></div>
+                    <div class="stat-info">
+                        <h4>亮灯率</h4>
+                        <div class="stat-value">${d.lightOnRate}%</div>
+                        <div class="stat-sub">亮灯 ${d.lightOnCount} 盏</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon danger"><i data-lucide="alert-triangle"></i></div>
+                    <div class="stat-info">
+                        <h4>故障设备</h4>
+                        <div class="stat-value">${d.faultCount}</div>
+                        <div class="stat-sub">待处理告警 ${d.unhandledAlarms}</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon info"><i data-lucide="zap"></i></div>
+                    <div class="stat-info">
+                        <h4>今日能耗</h4>
+                        <div class="stat-value text-accent">${Number(d.todayEnergy).toFixed(1)}</div>
+                        <div class="stat-sub">kWh · 月累计 ${Number(d.monthEnergy).toFixed(1)} kWh</div>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon primary"><i data-lucide="wrench"></i></div>
+                    <div class="stat-info">
+                        <h4>待处理工单</h4>
+                        <div class="stat-value">${d.pendingOrders}</div>
+                        <div class="stat-sub">待审核报修 ${d.pendingReports}</div>
+                    </div>
+                </div>`;
+            if (window.lucide) lucide.createIcons();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    }
+
+    // 能耗趋势图
+    async function loadEnergyChart() {
+        try {
+            const res = await statsApi.energyDaily();
+            const chart = echarts.init(document.getElementById('energyChart'));
+            chart.setOption({
+                tooltip: { trigger: 'axis', formatter: '{b}<br/>能耗: {c} kWh' },
+                grid: { left: 50, right: 20, top: 20, bottom: 30 },
+                xAxis: {
+                    type: 'category',
+                    data: res.data.map(d => d.date.substring(5)),
+                    axisLine: { lineStyle: { color: '#E2E8F0' } },
+                    axisLabel: { color: '#64748B', fontSize: 11 }
+                },
+                yAxis: {
+                    type: 'value',
+                    name: 'kWh',
+                    axisLine: { show: false },
+                    splitLine: { lineStyle: { color: '#F1F5F9' } },
+                    axisLabel: { color: '#64748B', fontSize: 11 }
+                },
+                series: [{
+                    type: 'line',
+                    data: res.data.map(d => Number(d.energy)),
+                    smooth: true,
+                    lineStyle: { color: '#3B82F6', width: 2.5 },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(59,130,246,0.2)' },
+                            { offset: 1, color: 'rgba(59,130,246,0.02)' }
+                        ])
+                    },
+                    itemStyle: { color: '#3B82F6' },
+                    symbol: 'circle',
+                    symbolSize: 6
+                }]
+            });
+            window.addEventListener('resize', () => chart.resize());
+        } catch (err) { console.error('能耗图表加载失败', err); }
+    }
+
+    // 告警类型饼图
+    async function loadAlarmChart() {
+        try {
+            const res = await statsApi.alarmByType();
+            const chart = echarts.init(document.getElementById('alarmChart'));
+            const colors = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#6B7280'];
+            chart.setOption({
+                tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+                legend: { bottom: 0, textStyle: { fontSize: 12, color: '#64748B' } },
+                color: colors,
+                series: [{
+                    type: 'pie',
+                    radius: ['40%', '65%'],
+                    center: ['50%', '45%'],
+                    avoidLabelOverlap: false,
+                    label: { show: false },
+                    emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
+                    data: res.data.map(d => ({ name: d.typeName, value: d.count }))
+                }]
+            });
+            window.addEventListener('resize', () => chart.resize());
+        } catch (err) { console.error('告警图表加载失败', err); }
+    }
+
+    // 设备类型统计
+    async function loadDeviceChart() {
+        try {
+            const res = await statsApi.deviceByType();
+            const chart = echarts.init(document.getElementById('deviceChart'));
+            chart.setOption({
+                tooltip: { trigger: 'axis' },
+                grid: { left: 60, right: 20, top: 20, bottom: 30 },
+                xAxis: {
+                    type: 'category',
+                    data: res.data.map(d => d.lampType || '未知'),
+                    axisLine: { lineStyle: { color: '#E2E8F0' } },
+                    axisLabel: { color: '#64748B' }
+                },
+                yAxis: {
+                    type: 'value',
+                    axisLine: { show: false },
+                    splitLine: { lineStyle: { color: '#F1F5F9' } },
+                    axisLabel: { color: '#64748B' }
+                },
+                series: [{
+                    type: 'bar',
+                    data: res.data.map(d => d.count),
+                    barWidth: 40,
+                    itemStyle: {
+                        borderRadius: [6, 6, 0, 0],
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: '#1B3A5C' },
+                            { offset: 1, color: '#2A5580' }
+                        ])
+                    }
+                }]
+            });
+            window.addEventListener('resize', () => chart.resize());
+        } catch (err) { console.error('设备图表加载失败', err); }
+    }
+
+    // 最新公告
+    async function loadAnnouncements() {
+        try {
+            const res = await announceApi.published();
+            const list = res.data.slice(0, 5);
+            if (list.length === 0) {
+                document.getElementById('announceList').innerHTML = '<div class="empty-state"><p>暂无公告</p></div>';
+                return;
+            }
+            document.getElementById('announceList').innerHTML = list.map(a => `
+                <div style="padding:12px 0;border-bottom:1px solid var(--border-light);cursor:pointer" onclick="location.href='announcement.html?id=${a.id}'">
+                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                        ${a.topFlag === 1 ? '<span class="tag tag-danger" style="font-size:10px">置顶</span>' : ''}
+                        <span style="font-size:13px;font-weight:500">${a.title}</span>
+                    </div>
+                    <span style="font-size:12px;color:var(--text-muted)">${formatDateTime(a.publishTime)}</span>
+                </div>
+            `).join('');
+        } catch (err) { console.error('公告加载失败', err); }
+    }
+
+    // 初始化
+    loadOverview();
+    loadEnergyChart();
+    loadAlarmChart();
+    loadDeviceChart();
+    loadAnnouncements();
+</script>
+</body>
+</html>

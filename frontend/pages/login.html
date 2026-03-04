@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 城市智慧路灯管理系统</title>
+    <meta name="description" content="城市智慧路灯管理信息系统登录页面">
+    <link rel="stylesheet" href="../css/style.css">
+    <style>
+        /* ===== Login Page Overrides ===== */
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #0a1628;
+            position: relative;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        /* Night sky gradient background */
+        .login-bg {
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse at 20% 80%, rgba(30, 64, 120, 0.4) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 100%, rgba(245, 158, 11, 0.08) 0%, transparent 40%),
+                linear-gradient(180deg, #060e1a 0%, #0d1f38 40%, #152a46 70%, #1a3050 100%);
+        }
+
+        /* Animated stars */
+        .stars {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: #fff;
+            border-radius: 50%;
+            animation: starTwinkle 3s ease-in-out infinite;
+        }
+
+        @keyframes starTwinkle {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.8; }
+        }
+
+        /* City skyline silhouette */
+        .city-skyline {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 280px;
+            z-index: 1;
+        }
+
+        .city-skyline svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Streetlight elements */
+        .streetlights {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 280px;
+            z-index: 2;
+        }
+
+        .streetlight-pole {
+            position: absolute;
+            bottom: 60px;
+        }
+
+        .pole-line {
+            position: absolute;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(to top, #2a3a52, #1e2d42);
+            border-radius: 2px;
+        }
+
+        .lamp-head {
+            position: absolute;
+            width: 22px;
+            height: 10px;
+            background: #3a4f6b;
+            border-radius: 3px 3px 0 0;
+        }
+
+        .lamp-glow {
+            position: absolute;
+            width: 12px;
+            height: 6px;
+            background: #fbbf24;
+            border-radius: 0 0 50% 50%;
+            box-shadow: 
+                0 0 8px 2px rgba(251, 191, 36, 0.6),
+                0 0 20px 6px rgba(251, 191, 36, 0.3),
+                0 0 40px 12px rgba(251, 191, 36, 0.1);
+            animation: lampFlicker 4s ease-in-out infinite;
+        }
+
+        .lamp-cone {
+            position: absolute;
+            width: 0;
+            height: 0;
+            border-left: 40px solid transparent;
+            border-right: 40px solid transparent;
+            border-top: 120px solid rgba(251, 191, 36, 0.04);
+            filter: blur(4px);
+        }
+
+        @keyframes lampFlicker {
+            0%, 100% { opacity: 0.9; }
+            30% { opacity: 1; }
+            50% { opacity: 0.85; }
+            70% { opacity: 1; }
+        }
+
+        /* Light pole 1 */
+        .sl-1 { left: 8%; }
+        .sl-1 .pole-line { height: 160px; left: 10px; }
+        .sl-1 .lamp-head { top: -4px; left: 0; }
+        .sl-1 .lamp-glow { top: 6px; left: 5px; }
+        .sl-1 .lamp-cone { top: 10px; left: -29px; }
+
+        /* Light pole 2 */
+        .sl-2 { left: 25%; }
+        .sl-2 .pole-line { height: 140px; left: 10px; }
+        .sl-2 .lamp-head { top: 16px; left: 0; }
+        .sl-2 .lamp-glow { top: 26px; left: 5px; }
+        .sl-2 .lamp-cone { top: 30px; left: -29px; }
+
+        /* Light pole 3 */
+        .sl-3 { right: 22%; }
+        .sl-3 .pole-line { height: 155px; left: 10px; }
+        .sl-3 .lamp-head { top: 5px; left: 0; }
+        .sl-3 .lamp-glow { top: 15px; left: 5px; }
+        .sl-3 .lamp-cone { top: 19px; left: -29px; }
+
+        /* Light pole 4 */
+        .sl-4 { right: 6%; }
+        .sl-4 .pole-line { height: 145px; left: 10px; }
+        .sl-4 .lamp-head { top: 15px; left: 0; }
+        .sl-4 .lamp-glow { top: 25px; left: 5px; }
+        .sl-4 .lamp-cone { top: 29px; left: -29px; }
+
+        /* Road at bottom */
+        .road {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(180deg, #131f30 0%, #0e1824 100%);
+            z-index: 3;
+        }
+
+        .road::before {
+            content: '';
+            position: absolute;
+            top: 28px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: repeating-linear-gradient(90deg, #2a3a52 0, #2a3a52 40px, transparent 40px, transparent 80px);
+        }
+
+        /* Login card - Glassmorphism */
+        .login-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            margin: 0 20px;
+            background: rgba(255, 255, 255, 0.06);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 48px 40px;
+            box-shadow: 
+                0 25px 60px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            animation: cardFadeIn 0.8s ease-out;
+        }
+
+        @keyframes cardFadeIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Logo area */
+        .login-logo {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+
+        .login-logo .logo-lamp {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 16px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            box-shadow: 
+                0 0 20px rgba(245, 158, 11, 0.3),
+                0 0 40px rgba(245, 158, 11, 0.1);
+            animation: logoPulse 3s ease-in-out infinite;
+        }
+
+        @keyframes logoPulse {
+            0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.3), 0 0 40px rgba(245, 158, 11, 0.1); }
+            50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.5), 0 0 60px rgba(245, 158, 11, 0.2); }
+        }
+
+        .login-logo h2 {
+            font-size: 24px;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+        }
+
+        .login-logo p {
+            font-size: 12px;
+            color: rgba(148, 163, 184, 0.7);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        /* Form styles */
+        .login-form .input-group {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .login-form .input-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .login-form .input-wrapper {
+            position: relative;
+        }
+
+        .login-form .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            opacity: 0.5;
+            z-index: 1;
+        }
+
+        .login-form input[type="text"],
+        .login-form input[type="password"] {
+            width: 100%;
+            padding: 13px 14px 13px 42px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            color: #e2e8f0;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .login-form input::placeholder {
+            color: rgba(148, 163, 184, 0.4);
+        }
+
+        .login-form input:focus {
+            border-color: rgba(245, 158, 11, 0.5);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+        }
+
+        .login-form .login-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 8px;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            border: none;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 4px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .login-form .login-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(245, 158, 11, 0.35);
+        }
+
+        .login-form .login-btn:active {
+            transform: translateY(0);
+        }
+
+        .login-form .login-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* Shimmer effect on button */
+        .login-form .login-btn::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            animation: btnShimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes btnShimmer {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        /* Footer links */
+        .login-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 13px;
+            color: rgba(148, 163, 184, 0.6);
+        }
+
+        .login-footer a {
+            color: #fbbf24;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .login-footer a:hover {
+            color: #f59e0b;
+        }
+
+        /* Test account panel */
+        .test-accounts {
+            margin-top: 24px;
+            padding: 14px 16px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 12px;
+        }
+
+        .test-accounts .test-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(148, 163, 184, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 10px;
+        }
+
+        .test-accounts .test-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 12px;
+            color: rgba(226, 232, 240, 0.6);
+            cursor: pointer;
+            transition: all 0.2s;
+            border-radius: 6px;
+            padding: 6px 8px;
+            margin: 0 -8px;
+        }
+
+        .test-accounts .test-row:hover {
+            background: rgba(255, 255, 255, 0.06);
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        .test-accounts .test-role {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            padding: 2px 0;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .role-admin { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        .role-operator { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+        .role-user { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+
+        .test-accounts .test-cred {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            letter-spacing: 0.5px;
+        }
+
+        /* Copyright */
+        .login-copyright {
+            position: absolute;
+            bottom: 16px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(148, 163, 184, 0.25);
+            z-index: 10;
+        }
+
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 36px 24px;
+                margin: 0 16px;
+            }
+            .login-logo h2 { font-size: 20px; }
+            .streetlights { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <!-- Background layers -->
+        <div class="login-bg"></div>
+
+        <!-- Stars -->
+        <div class="stars" id="stars"></div>
+
+        <!-- City skyline -->
+        <div class="city-skyline">
+            <svg viewBox="0 0 1440 280" preserveAspectRatio="none" fill="none">
+                <!-- Buildings silhouette -->
+                <path d="M0 280V200h40v-20h10v-40h20v40h10v20h30v-60h15v-30h10v30h15v60h20v-40h10v-80h20v80h10v40h25v-30h10v-50h20v50h10v30h30v-70h15v-40h10v40h15v70h20v-20h10v-60h20v60h10v20h30v-90h15v-20h10v20h15v90h20v-30h10v-40h20v40h10v30h25v-50h10v-80h20v80h10v50h30v-30h10v-60h20v60h10v30h20v-40h10v-30h20v30h10v40h30v-20h10v-70h20v70h10v20h25v-50h10v-40h20v40h10v50h20v-60h10v-30h20v30h10v60h30v-40h10v-20h20v20h10v40h30v-80h15v-30h10v30h15v80h20V280z" fill="#0d1824"/>
+                <!-- Foreground buildings -->
+                <path d="M0 280V220h50v-30h10v-20h15v20h10v30h40v-50h10v-30h20v30h10v50h30v-20h10v-40h15v40h10v20h40v-60h10v-20h20v20h10v60h35v-30h10v-50h15v50h10v30h40v-70h10v-20h15v20h10v70h30v-40h10v-30h20v30h10v40h45v-20h10v-40h15v40h10v20h35v-50h10v-20h20v20h10v50h40v-30h10v-60h15v60h10v30h30v-40h10v-20h20v20h10v40h45v-30h10v-40h15v40h10v30h60V280z" fill="#111d2e"/>
+            </svg>
+        </div>
+
+        <!-- Streetlights -->
+        <div class="streetlights">
+            <div class="streetlight-pole sl-1">
+                <div class="pole-line"></div>
+                <div class="lamp-head"></div>
+                <div class="lamp-glow"></div>
+                <div class="lamp-cone"></div>
+            </div>
+            <div class="streetlight-pole sl-2">
+                <div class="pole-line"></div>
+                <div class="lamp-head"></div>
+                <div class="lamp-glow" style="animation-delay: 1s"></div>
+                <div class="lamp-cone"></div>
+            </div>
+            <div class="streetlight-pole sl-3">
+                <div class="pole-line"></div>
+                <div class="lamp-head"></div>
+                <div class="lamp-glow" style="animation-delay: 2s"></div>
+                <div class="lamp-cone"></div>
+            </div>
+            <div class="streetlight-pole sl-4">
+                <div class="pole-line"></div>
+                <div class="lamp-head"></div>
+                <div class="lamp-glow" style="animation-delay: 0.5s"></div>
+                <div class="lamp-cone"></div>
+            </div>
+        </div>
+
+        <!-- Road -->
+        <div class="road"></div>
+
+        <!-- Login Card -->
+        <div class="login-card">
+            <div class="login-logo">
+                <div class="logo-lamp"><i data-lucide="building-2" style="width:32px;height:32px;color:#fff"></i></div>
+                <h2>城市智慧路灯管理系统</h2>
+                <p>Smart Streetlight Management</p>
+            </div>
+            <form class="login-form" id="loginForm">
+                <div class="input-group">
+                    <label class="input-label">用户名</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon"><i data-lucide="user" style="width:16px;height:16px;color:rgba(148,163,184,0.6)"></i></span>
+                        <input type="text" id="username" placeholder="请输入用户名" required autocomplete="username">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">密码</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon"><i data-lucide="lock" style="width:16px;height:16px;color:rgba(148,163,184,0.6)"></i></span>
+                        <input type="password" id="password" placeholder="请输入密码" required autocomplete="current-password">
+                    </div>
+                </div>
+                <button type="submit" class="login-btn" id="loginBtn">登 录</button>
+            </form>
+            <div class="login-footer">
+                还没有账号？<a href="register.html">立即注册</a>
+            </div>
+            <div class="test-accounts">
+                <div class="test-title">测试账号（点击快速填入）</div>
+                <div class="test-row" onclick="fillLogin('admin','123456')">
+                    <span class="test-role role-admin">管理员</span>
+                    <span class="test-cred">admin / 123456</span>
+                </div>
+                <div class="test-row" onclick="fillLogin('operator1','123456')">
+                    <span class="test-role role-operator">运维员</span>
+                    <span class="test-cred">operator1 / 123456</span>
+                </div>
+                <div class="test-row" onclick="fillLogin('user1','123456')">
+                    <span class="test-role role-user">市 民</span>
+                    <span class="test-cred">user1 / 123456</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Copyright -->
+        <div class="login-copyright">© 2026 城市智慧路灯管理信息系统</div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/utils.js"></script>
+    <script>
+        // Render Lucide icons
+        if (window.lucide) lucide.createIcons();
+
+        // Generate random stars
+        (function() {
+            const container = document.getElementById('stars');
+            for (let i = 0; i < 80; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 60 + '%';
+                star.style.width = (Math.random() * 2 + 1) + 'px';
+                star.style.height = star.style.width;
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                container.appendChild(star);
+            }
+        })();
+
+        // Quick fill test account
+        function fillLogin(username, password) {
+            document.getElementById('username').value = username;
+            document.getElementById('password').value = password;
+            document.getElementById('username').focus();
+        }
+
+        // Redirect if already logged in
+        if (isLoggedIn()) location.href = 'dashboard.html';
+
+        // Login form handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.textContent = '登录中...';
+            try {
+                const res = await authApi.login({
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value
+                });
+                localStorage.setItem('token', res.data.token);
+                localStorage.setItem('user', JSON.stringify({
+                    userId: res.data.userId,
+                    username: res.data.username,
+                    realName: res.data.realName,
+                    avatar: res.data.avatar,
+                    roles: res.data.roles
+                }));
+                showToast('登录成功，正在跳转...', 'success');
+                setTimeout(() => location.href = 'dashboard.html', 500);
+            } catch (err) {
+                showToast(err.message, 'error');
+                btn.disabled = false;
+                btn.textContent = '登 录';
+            }
+        });
+    </script>
+</body>
+</html>

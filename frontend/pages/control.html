@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时控制 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">实时控制</h2>
+            
+<div class="grid-2" style="margin-bottom:20px">
+    <div class="card">
+        <div class="card-header"><h3><i data-lucide="sliders-horizontal" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>远程控制</h3></div>
+        <div class="card-body">
+            <div class="form-group"><label class="form-label">控制方式</label>
+                <select class="form-select" id="controlMode" onchange="toggleControlMode()">
+                    <option value="single">单灯控制</option><option value="area">区域控制</option>
+                </select>
+            </div>
+            <div class="form-group" id="singleGroup"><label class="form-label">选择路灯</label><select class="form-select" id="lightSelect" multiple style="height:120px"></select></div>
+            <div class="form-group" id="areaGroup" style="display:none"><label class="form-label">选择区域</label><select class="form-select" id="areaSelect"></select></div>
+            <div class="form-group"><label class="form-label">操作</label>
+                <select class="form-select" id="actionSelect">
+                    <option value="TURN_ON">开灯</option><option value="TURN_OFF">关灯</option><option value="SET_BRIGHTNESS">调节亮度</option>
+                </select>
+            </div>
+            <div class="form-group" id="brightnessGroup"><label class="form-label">亮度 <span id="brightnessVal">100</span>%</label>
+                <input type="range" id="brightnessSlider" min="0" max="100" value="100" style="width:100%" oninput="document.getElementById('brightnessVal').textContent=this.value"></div>
+            <div class="form-group"><label class="form-label">备注</label><input class="form-input" id="controlRemark" placeholder="操作备注(可选)"></div>
+            <button class="btn btn-primary btn-lg" style="width:100%" onclick="executeControl()">执行控制</button>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-header"><h3><i data-lucide="clipboard-list" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>操作日志</h3></div>
+        <div class="card-body" id="logContent"><div class="loading"><div class="spinner"></div></div></div>
+    </div>
+</div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('control','实时控制'))throw'';</script>
+<script>
+async function init(){
+    try{
+        const[lightsRes,areasRes]=await Promise.all([lightApi.all(),areaApi.list()]);
+        const sel=document.getElementById('lightSelect');
+        sel.innerHTML=lightsRes.data.map(l=>`<option value="${l.id}">${l.code} - ${l.name}</option>`).join('');
+        const asel=document.getElementById('areaSelect');
+        asel.innerHTML=areasRes.data.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
+    }catch(err){showToast(err.message,'error');}
+    loadLogs();
+}
+function toggleControlMode(){
+    const mode=document.getElementById('controlMode').value;
+    document.getElementById('singleGroup').style.display=mode==='single'?'':'none';
+    document.getElementById('areaGroup').style.display=mode==='area'?'':'none';
+}
+async function executeControl(){
+    const mode=document.getElementById('controlMode').value;
+    const action=document.getElementById('actionSelect').value;
+    const data={action,brightness:parseInt(document.getElementById('brightnessSlider').value),remark:document.getElementById('controlRemark').value};
+    if(mode==='single'){
+        const sel=document.getElementById('lightSelect');
+        data.streetlightIds=Array.from(sel.selectedOptions).map(o=>parseInt(o.value));
+        if(!data.streetlightIds.length){showToast('请选择路灯','warning');return;}
+    }else{data.areaId=parseInt(document.getElementById('areaSelect').value);}
+    try{const res=await controlApi.execute(data);showToast(res.message||'操作成功','success');loadLogs();}catch(err){showToast(err.message,'error');}
+}
+async function loadLogs(){
+    try{const res=await controlApi.logs({page:1,size:15});const logs=res.data.content||res.data;
+    document.getElementById('logContent').innerHTML=(Array.isArray(logs)?logs:[]).map(l=>`
+        <div style="padding:8px 0;border-bottom:1px solid var(--border-light);font-size:12px">
+            <div class="flex justify-between"><span><strong>${l.action}</strong> ${l.detail||''}</span><span class="tag ${l.result===1?'tag-success':'tag-danger'}" style="font-size:10px">${l.result===1?'成功':'失败'}</span></div>
+            <div class="text-muted" style="margin-top:2px">${formatDateTime(l.createdAt)} ${l.remark||''}</div>
+        </div>`).join('')||'<div class="empty-state"><p>暂无日志</p></div>';}catch(err){showToast(err.message,'error');}
+}
+init();
+</script>
+</body>
+</html>

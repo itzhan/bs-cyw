@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>维修工单 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">维修工单</h2>
+            
+<div class="card">
+    <div class="card-header"><h3>维修工单</h3><button class="btn btn-primary btn-sm" onclick="openCreate()" id="createBtn">+ 新建工单</button></div>
+    <div class="card-body">
+        <div class="search-bar">
+            <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="searchInput" placeholder="搜索工单..." onkeyup="if(event.key==='Enter')loadOrders()"></div>
+            <select class="form-select" id="filterStatus" style="width:120px" onchange="loadOrders()"><option value="">全部状态</option><option value="0">待分配</option><option value="1">已分配</option><option value="2">处理中</option><option value="3">已完成</option><option value="4">已关闭</option></select>
+            <button class="btn btn-primary btn-sm" onclick="loadOrders()">查询</button>
+        </div>
+        <div class="table-container"><table class="data-table"><thead><tr><th>工单号</th><th>标题</th><th>优先级</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
+        <tbody id="orderTableBody"><tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
+        <div id="pagination"></div>
+    </div>
+</div>
+<div class="modal-overlay" id="createModal"><div class="modal" style="max-width:600px">
+    <div class="modal-header"><h3>新建工单</h3><button class="modal-close" onclick="closeModal('createModal')">✕</button></div>
+    <div class="modal-body">
+        <div class="form-group"><label class="form-label">工单标题</label><input class="form-input" id="woTitle" required></div>
+        <div class="form-group"><label class="form-label">问题描述</label><textarea class="form-textarea" id="woDesc"></textarea></div>
+        <div class="grid-2">
+            <div class="form-group"><label class="form-label">优先级</label><select class="form-select" id="woPriority"><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option><option value="4">紧急</option></select></div>
+        </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('createModal')">取消</button><button class="btn btn-primary" onclick="submitCreate()">提交</button></div>
+</div></div>
+        </div>
+    </main>
+</div>
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/utils.js"></script>
+<script>if(!initPage('workorder','维修工单'))throw'';</script>
+<script>
+let currentPage=1;
+async function loadOrders(page){currentPage=page||1;try{const res=await orderApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value,status:document.getElementById('filterStatus').value});const d=res.data;
+document.getElementById('orderTableBody').innerHTML=d.records.map(w=>`<tr><td><code>${w.orderNo}</code></td><td>${w.title}</td><td>${statusTag('workOrderPriority',w.priority)}</td><td>${statusTag('workOrderStatus',w.status)}</td><td>${formatDateTime(w.createdAt)}</td><td><button class="btn btn-outline btn-sm" onclick="location.href='workorder.html?detail='+${w.id}">详情</button></td></tr>`).join('')||'<tr><td colspan="6" class="text-center text-muted">暂无工单</td></tr>';
+renderPagination('pagination',d.total,d.page,d.size,loadOrders);}catch(err){showToast(err.message,'error');}}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+function openCreate(){document.getElementById('createModal').classList.add('show');}
+async function submitCreate(){try{await orderApi.create({title:document.getElementById('woTitle').value,description:document.getElementById('woDesc').value,priority:parseInt(document.getElementById('woPriority').value)});showToast('创建成功','success');closeModal('createModal');loadOrders();}catch(err){showToast(err.message,'error');}}
+loadOrders();
+</script>
+</body>
+</html>

@@ -80,7 +80,7 @@ public class StatisticsController {
     public Result<?> alarmByType() {
         LocalDateTime thirtyDaysAgo = LocalDateTime.now().minusDays(30);
         List<Object[]> results = alarmRepository.countByTypeSince(thirtyDaysAgo);
-        Map<String, String> typeNames = Map.of("1", "灯具故障", "2", "电压异常", "3", "电流异常", "4", "通信故障", "5", "线缆异常", "6", "其他");
+        Map<String, String> typeNames = Map.of("1", "灯具故障", "2", "电压异常", "3", "电流异常", "4", "通信故障", "5", "线缆异常", "6", "温度异常", "7", "漏电告警", "8", "其他");
         List<Map<String, Object>> data = new ArrayList<>();
         for (Object[] row : results) {
             Map<String, Object> m = new HashMap<>();

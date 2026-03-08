@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MQTT通信 - 智慧路灯管理信息系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="../js/utils.js" defer></script>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="header" id="topHeader"></header>
+        <div class="content-body">
+            <!-- MQTT 连接状态 -->
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header"><h3>MQTT 连接状态</h3></div>
+                <div class="card-body">
+                    <div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap">
+                        <div><b>Broker：</b><span id="mqttBroker">-</span></div>
+                        <div><b>连接状态：</b><span id="mqttStatus" class="tag tag-default">加载中</span></div>
+                        <div><b>上行消息：</b><span id="mqttUplink">-</span></div>
+                        <div><b>下行消息：</b><span id="mqttDownlink">-</span></div>
+                    </div>
+                </div>
+            </div>
+            <!-- 手动发送 -->
+            <div class="card" style="margin-bottom:20px">
+                <div class="card-header"><h3>手动发送指令</h3></div>
+                <div class="card-body">
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+                        <div class="form-group" style="flex:1;min-width:160px">
+                            <label>设备UID</label>
+                            <input type="text" id="pubDeviceUid" placeholder="如 DEV-HYL-001" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex:2;min-width:250px">
+                            <label>Payload (JSON)</label>
+                            <input type="text" id="pubPayload" placeholder='{"action":"TURN_ON","brightness":100}' class="form-control">
+                        </div>
+                        <button class="btn btn-primary" onclick="publishMsg()">发送</button>
+                    </div>
+                </div>
+            </div>
+            <!-- 消息列表 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>通信消息记录</h3>
+                    <div style="display:flex;gap:8px">
+                        <select id="filterDir" class="form-control" style="width:120px" onchange="loadMessages()">
+                            <option value="">全部方向</option>
+                            <option value="1">上行(设备→平台)</option>
+                            <option value="2">下行(平台→设备)</option>
+                        </select>
+                        <input type="text" id="filterDevice" class="form-control" placeholder="设备UID" style="width:160px">
+                        <button class="btn btn-outline" onclick="loadMessages()">搜索</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>时间</th><th>设备UID</th><th>方向</th><th>Topic</th><th>Payload</th><th>状态</th>
+                        </tr></thead>
+                        <tbody id="msgBody"></tbody>
+                    </table>
+                    <div id="pagination"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script>
+    let currentPage = 1;
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!initPage('mqtt', 'MQTT通信')) return;
+        loadStatus();
+        loadMessages();
+    });
+
+    function loadStatus() {
+        fetch('/api/mqtt/status', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
+            .then(r => r.json()).then(res => {
+                if (res.code !== 200) return;
+                const d = res.data;
+                document.getElementById('mqttBroker').textContent = d.broker;
+                const st = document.getElementById('mqttStatus');
+                st.textContent = d.connected ? '已连接' : '未连接';
+                st.className = 'tag ' + (d.connected ? 'tag-success' : 'tag-warning');
+                document.getElementById('mqttUplink').textContent = d.totalUplink;
+                document.getElementById('mqttDownlink').textContent = d.totalDownlink;
+            }).catch(() => {});
+    }
+
+    function loadMessages() {
+        const dir = document.getElementById('filterDir').value;
+        const dev = document.getElementById('filterDevice').value;
+        let url = `/api/mqtt/messages?page=${currentPage}&size=15`;
+        if (dir) url += `&direction=${dir}`;
+        if (dev) url += `&deviceUid=${encodeURIComponent(dev)}`;
+        fetch(url, { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
+            .then(r => r.json()).then(res => {
+                if (res.code !== 200) return;
+                const d = res.data;
+                const tbody = document.getElementById('msgBody');
+                tbody.innerHTML = (d.records || []).map(m => `<tr>
+                    <td>${formatDateTime(m.createdAt)}</td>
+                    <td><code>${m.deviceUid || '-'}</code></td>
+                    <td>${m.direction === 1 ? '<span class="tag tag-info">上行</span>' : '<span class="tag tag-warning">下行</span>'}</td>
+                    <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${m.topic}</td>
+                    <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${m.payload || ''}</td>
+                    <td>${m.status === 1 ? '<span class="tag tag-success">成功</span>' : '<span class="tag tag-danger">失败</span>'}</td>
+                </tr>`).join('');
+                renderPagination('pagination', d.total, d.page, d.size, p => { currentPage = p; loadMessages(); });
+            }).catch(() => {});
+    }
+
+    function publishMsg() {
+        const deviceUid = document.getElementById('pubDeviceUid').value.trim();
+        const payload = document.getElementById('pubPayload').value.trim();
+        if (!deviceUid || !payload) { showToast('请填写设备UID和Payload', 'warning'); return; }
+        fetch('/api/mqtt/publish', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+            body: JSON.stringify({ deviceUid, payload })
+        }).then(r => r.json()).then(res => {
+            showToast(res.data || res.message, res.code === 200 ? 'success' : 'error');
+            loadMessages(); loadStatus();
+        }).catch(() => showToast('发送失败', 'error'));
+    }
+</script>
+</body>
+</html>

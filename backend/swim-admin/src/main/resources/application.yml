@@ -37,6 +37,14 @@ upload:
   path: ./uploads
   base-url: http://localhost:8080/uploads
 
+# MQTT 物联网通信配置
+mqtt:
+  enabled: false  # 设为 true 并配置 broker 后启用实际 MQTT 连接
+  broker-url: tcp://localhost:1883
+  client-id: smart-streetlight-server
+  username: ""
+  password: ""
+
 # 日志
 logging:
   level:

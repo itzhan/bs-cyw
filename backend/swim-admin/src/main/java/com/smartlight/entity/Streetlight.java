@@ -18,6 +18,9 @@ public class Streetlight {
     @Column(nullable = false, unique = true, length = 50)
     private String code;
 
+    @Column(name = "device_uid", length = 100)
+    private String deviceUid;
+
     @Column(nullable = false, length = 100)
     private String name;
 
@@ -38,6 +41,15 @@ public class Streetlight {
 
     @Column(name = "lamp_type", length = 50)
     private String lampType;
+
+    @Column(name = "hardware_model", length = 100)
+    private String hardwareModel;
+
+    @Column(name = "electrical_params", length = 500)
+    private String electricalParams;
+
+    @Column(name = "protection_rating", length = 20)
+    private String protectionRating;
 
     private Integer power;
 

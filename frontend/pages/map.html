@@ -152,6 +152,7 @@
                             <option value="offline">离线</option>
                             <option value="maintain">维护中</option>
                         </select>
+                        <button class="btn btn-outline btn-sm" onclick="refreshMapData()" style="padding:6px 12px;font-size:12px"><i data-lucide="refresh-cw" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:3px"></i>刷新数据</button>
                     </div>
                 </div>
                 <div class="card-body">
@@ -330,6 +331,12 @@
 
     map.addControl(new AMap.Scale());
     map.addControl(new AMap.ToolBar({ position: 'RT' }));
+
+    // Expose refresh for the toolbar button
+    window.refreshMapData = function() {
+        showToast('正在刷新...','info', 1500);
+        loadDevices();
+    };
 
     // Wait for map to be fully ready, then load devices
     map.on('complete', function() {

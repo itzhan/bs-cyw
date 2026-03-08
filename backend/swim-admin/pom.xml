@@ -78,6 +78,13 @@
 			<version>5.8.34</version>
 		</dependency>
 
+		<!-- MQTT (Eclipse Paho) -->
+		<dependency>
+			<groupId>org.eclipse.paho</groupId>
+			<artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+			<version>1.2.5</version>
+		</dependency>
+
 		<!-- H2 for testing -->
 		<dependency>
 			<groupId>com.h2database</groupId>

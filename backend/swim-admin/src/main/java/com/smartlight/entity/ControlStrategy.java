@@ -18,8 +18,14 @@ public class ControlStrategy {
     @Column(nullable = false, length = 100)
     private String name;
 
+    @Column(name = "group_no")
+    private Integer groupNo;
+
     @Column(nullable = false)
     private Integer type;
+
+    @Column(name = "action_type")
+    private Integer actionType = 1;
 
     @Column(name = "area_id")
     private Long areaId;
@@ -37,6 +43,12 @@ public class ControlStrategy {
 
     @Column(name = "light_threshold")
     private Integer lightThreshold;
+
+    @Column(name = "target_longitude", precision = 10, scale = 7)
+    private java.math.BigDecimal targetLongitude;
+
+    @Column(name = "target_latitude", precision = 10, scale = 7)
+    private java.math.BigDecimal targetLatitude;
 
     @Column(name = "effective_start")
     private LocalDate effectiveStart;

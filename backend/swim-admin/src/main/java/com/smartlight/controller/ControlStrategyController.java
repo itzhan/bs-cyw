@@ -48,12 +48,16 @@ public class ControlStrategyController {
         ControlStrategy entity = strategyRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("策略不存在"));
         if (dto.getName() != null) entity.setName(dto.getName());
+        if (dto.getGroupNo() != null) entity.setGroupNo(dto.getGroupNo());
         if (dto.getType() != null) entity.setType(dto.getType());
+        if (dto.getActionType() != null) entity.setActionType(dto.getActionType());
         if (dto.getDescription() != null) entity.setDescription(dto.getDescription());
         if (dto.getStartTime() != null) entity.setStartTime(dto.getStartTime());
         if (dto.getEndTime() != null) entity.setEndTime(dto.getEndTime());
         if (dto.getBrightness() != null) entity.setBrightness(dto.getBrightness());
         if (dto.getLightThreshold() != null) entity.setLightThreshold(dto.getLightThreshold());
+        if (dto.getTargetLongitude() != null) entity.setTargetLongitude(dto.getTargetLongitude());
+        if (dto.getTargetLatitude() != null) entity.setTargetLatitude(dto.getTargetLatitude());
         if (dto.getEffectiveStart() != null) entity.setEffectiveStart(dto.getEffectiveStart());
         if (dto.getEffectiveEnd() != null) entity.setEffectiveEnd(dto.getEffectiveEnd());
         if (dto.getStatus() != null) entity.setStatus(dto.getStatus());

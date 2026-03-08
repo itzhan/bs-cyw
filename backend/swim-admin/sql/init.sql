@@ -12,6 +12,7 @@ SET CHARACTER_SET_RESULTS = utf8mb4;
 SET CHARACTER_SET_CONNECTION = utf8mb4;
 
 -- 先删除存在外健依赖的表
+DROP TABLE IF EXISTS mqtt_message;
 DROP TABLE IF EXISTS control_log;
 DROP TABLE IF EXISTS energy_record;
 DROP TABLE IF EXISTS work_order;
@@ -113,19 +114,23 @@ CREATE TABLE cabinet (
 CREATE TABLE streetlight (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     code VARCHAR(50) NOT NULL UNIQUE COMMENT '路灯编码',
+    device_uid VARCHAR(100) COMMENT '设备唯一标识(MQTT设备ID)',
     name VARCHAR(100) NOT NULL COMMENT '路灯名称',
     area_id BIGINT NOT NULL COMMENT '所属区域ID',
     cabinet_id BIGINT COMMENT '所属电柜ID',
-    address VARCHAR(500) COMMENT '安装地址',
-    longitude DECIMAL(10, 7) COMMENT '经度',
-    latitude DECIMAL(10, 7) COMMENT '纬度',
+    address VARCHAR(500) COMMENT '安装详细地址',
+    longitude DECIMAL(10, 7) COMMENT '经度(北斗定位)',
+    latitude DECIMAL(10, 7) COMMENT '纬度(北斗定位)',
     lamp_type VARCHAR(50) COMMENT '灯型: LED/钠灯/太阳能',
+    hardware_model VARCHAR(100) COMMENT '硬件型号',
+    electrical_params VARCHAR(500) COMMENT '电气参数(JSON: 额定电压/电流/频率等)',
+    protection_rating VARCHAR(20) COMMENT '防护等级(如IP65)',
     power INT COMMENT '额定功率(W)',
     height DECIMAL(5, 2) COMMENT '灯杆高度(m)',
     brightness TINYINT DEFAULT 100 COMMENT '当前亮度(0-100)',
     online_status TINYINT NOT NULL DEFAULT 1 COMMENT '在线状态: 0-离线 1-在线',
     light_status TINYINT NOT NULL DEFAULT 0 COMMENT '亮灯状态: 0-关 1-开',
-    device_status TINYINT NOT NULL DEFAULT 1 COMMENT '设备状态: 0-故障 1-正常 2-维护中 3-报废',
+    device_status TINYINT NOT NULL DEFAULT 1 COMMENT '设备状态: 0-故障 1-在线正常 2-在线异常 3-离线 4-待检修 5-暂停运行',
     install_date DATE COMMENT '安装日期',
     last_maintain_date DATE COMMENT '最近维护日期',
     voltage DECIMAL(6, 2) COMMENT '当前电压(V)',
@@ -134,6 +139,7 @@ CREATE TABLE streetlight (
     running_hours INT DEFAULT 0 COMMENT '累计运行小时数',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_device_uid (device_uid),
     INDEX idx_area_id (area_id),
     INDEX idx_cabinet_id (cabinet_id),
     INDEX idx_online_status (online_status),
@@ -148,13 +154,17 @@ CREATE TABLE streetlight (
 CREATE TABLE control_strategy (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     name VARCHAR(100) NOT NULL COMMENT '策略名称',
+    group_no TINYINT COMMENT '策略分组编号(1-16)',
     type TINYINT NOT NULL COMMENT '策略类型: 1-定时策略 2-光控策略 3-节假日策略 4-人流策略',
+    action_type TINYINT DEFAULT 1 COMMENT '动作类型: 1-时间点+动作 2-经纬度+动作',
     area_id BIGINT COMMENT '适用区域ID(NULL表示全局)',
     description VARCHAR(500) COMMENT '策略描述',
     start_time TIME COMMENT '开灯时间',
     end_time TIME COMMENT '关灯时间',
     brightness TINYINT COMMENT '亮度(0-100)',
     light_threshold INT COMMENT '光照阈值(lux)',
+    target_longitude DECIMAL(10, 7) COMMENT '目标经度(经纬度+动作类型)',
+    target_latitude DECIMAL(10, 7) COMMENT '目标纬度(经纬度+动作类型)',
     effective_start DATE COMMENT '生效开始日期',
     effective_end DATE COMMENT '生效结束日期',
     status TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 0-禁用 1-启用',
@@ -162,6 +172,7 @@ CREATE TABLE control_strategy (
     created_by BIGINT COMMENT '创建人ID',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_group_no (group_no),
     INDEX idx_type (type),
     INDEX idx_status (status),
     INDEX idx_area_id (area_id),
@@ -174,7 +185,7 @@ CREATE TABLE control_strategy (
 CREATE TABLE alarm (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     alarm_code VARCHAR(50) NOT NULL UNIQUE COMMENT '告警编码',
-    type TINYINT NOT NULL COMMENT '告警类型: 1-灯具故障 2-电压异常 3-电流异常 4-通信故障 5-线缆异常 6-其他',
+    type TINYINT NOT NULL COMMENT '告警类型: 1-灯具故障 2-电压异常 3-电流异常 4-通信故障 5-线缆异常 6-温度异常 7-漏电告警 8-其他',
     level TINYINT NOT NULL DEFAULT 2 COMMENT '告警级别: 1-低 2-中 3-高 4-紧急',
     streetlight_id BIGINT COMMENT '关联路灯ID',
     cabinet_id BIGINT COMMENT '关联电柜ID',
@@ -315,3 +326,20 @@ CREATE TABLE announcement (
     INDEX idx_type (type),
     INDEX idx_publish_time (publish_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告表';
+
+-- ============================================
+-- 14. MQTT通信消息表
+-- ============================================
+CREATE TABLE mqtt_message (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    device_uid VARCHAR(100) COMMENT '设备唯一标识',
+    topic VARCHAR(200) NOT NULL COMMENT 'MQTT主题',
+    payload TEXT COMMENT '消息内容(JSON)',
+    direction TINYINT NOT NULL DEFAULT 1 COMMENT '方向: 1-上行(设备→平台) 2-下行(平台→设备)',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态: 0-失败 1-成功',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_device_uid (device_uid),
+    INDEX idx_topic (topic),
+    INDEX idx_direction (direction),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQTT通信消息表';

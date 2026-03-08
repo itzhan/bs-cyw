@@ -3,39 +3,74 @@ chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 :: ============================================
-:: 城市智慧路灯管理信息系统 - Windows 启动脚本
+:: 城市智慧路灯管理信息系统 - Windows 一键启动
+:: 双击即可启动，无需安装任何开发环境
+:: 前提：已安装 Docker Desktop
 :: ============================================
 
 echo.
 echo ╔══════════════════════════════════════════════════╗
-echo ║     城市智慧路灯管理信息系统 - 启动脚本         ║
+echo ║   城市智慧路灯管理信息系统 - Docker 一键启动    ║
 echo ╚══════════════════════════════════════════════════╝
 echo.
 
-:: 1. 清理旧进程
-echo [1/3] 清理旧进程...
-taskkill /F /IM "java.exe" /T 2>nul
-echo       旧 Java 进程已清理
+:: ---------------------------------------------------
+:: 1. 检查 Docker 是否可用
+:: ---------------------------------------------------
+echo [1/3] 检查 Docker 环境...
 
-:: 杀掉占用 3000 端口的 Python 进程
-for /f "tokens=5" %%a in ('netstat -aon ^| findstr ":3000" ^| findstr "LISTENING" 2^>nul') do (
-    taskkill /F /PID %%a 2>nul
+where docker >nul 2>&1
+if %errorlevel% neq 0 (
+    echo.
+    echo   ╔══════════════════════════════════════════════╗
+    echo   ║  未检测到 Docker，请先安装 Docker Desktop   ║
+    echo   ║  下载地址: https://www.docker.com/products/  ║
+    echo   ║            docker-desktop                    ║
+    echo   ╚══════════════════════════════════════════════╝
+    echo.
+    pause
+    exit /b 1
+)
+
+:: 检查 Docker 引擎是否运行
+docker info >nul 2>&1
+if %errorlevel% neq 0 (
+    echo       Docker Desktop 未运行，正在尝试启动...
+    start "" "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    echo       等待 Docker Desktop 启动（约 30 秒）...
+    timeout /t 30 /nobreak >nul
+    docker info >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo       Docker Desktop 仍未就绪，请手动启动后再试。
+        pause
+        exit /b 1
+    )
+)
+echo       Docker 环境就绪
+echo.
+
+:: ---------------------------------------------------
+:: 2. 构建并启动所有容器
+:: ---------------------------------------------------
+echo [2/3] 构建并启动服务（首次启动需 3-5 分钟）...
+echo.
+
+cd /d "%~dp0"
+docker compose up -d --build
+
+if %errorlevel% neq 0 (
+    echo.
+    echo   启动失败，请检查错误信息。
+    pause
+    exit /b 1
 )
 echo.
 
-:: 2. 启动后端
-echo [2/3] 启动后端服务 (Spring Boot)...
-start "Smart Streetlight - Backend" cmd /k "cd /d %~dp0backend\swim-admin && mvn spring-boot:run"
-echo       后端已在新窗口启动
+:: ---------------------------------------------------
+:: 3. 显示信息面板
+:: ---------------------------------------------------
+echo [3/3] 启动完成！
 echo.
-
-:: 3. 启动前端
-echo [3/3] 启动前端服务 (HTTP Server)...
-start "Smart Streetlight - Frontend" cmd /k "cd /d %~dp0frontend && python -m http.server 3000"
-echo       前端已在新窗口启动
-echo.
-
-:: 信息面板
 echo ╔══════════════════════════════════════════════════════════════╗
 echo ║                   系统访问信息                              ║
 echo ╠══════════════════════════════════════════════════════════════╣
@@ -50,9 +85,9 @@ echo ║  运维员      operator2    123456     王运                   ║
 echo ║  普通用户    user1        123456     赵市民                 ║
 echo ║  普通用户    user2        123456     陈居民                 ║
 echo ╠══════════════════════════════════════════════════════════════╣
-echo ║  停止服务请运行: stop.bat                                   ║
+echo ║  停止服务: 双击 stop.bat 或运行 docker compose down        ║
 echo ╚══════════════════════════════════════════════════════════════╝
 echo.
-echo 提示: 后端和前端已在独立窗口中启动，请等待后端编译完成后访问
+echo 提示: 首次启动后端编译约需 2-3 分钟，请稍等后再访问前端页面
 echo.
 pause

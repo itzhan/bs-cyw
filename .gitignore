@@ -43,3 +43,7 @@ __pycache__/
 .agent/
 _agents/
 _agent/
+
+# ========== Mac 启动脚本（仅本地使用）==========
+start.sh
+stop.sh

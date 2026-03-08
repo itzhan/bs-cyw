@@ -70,11 +70,12 @@ const STATUS_MAP = {
     onlineStatus: { 0: { text: '离线', class: 'tag-default' }, 1: { text: '在线', class: 'tag-success' } },
     lightStatus: { 0: { text: '关灯', class: 'tag-default' }, 1: { text: '亮灯', class: 'tag-success' } },
     deviceStatus: {
-        0: { text: '故障', class: 'tag-danger' }, 1: { text: '正常', class: 'tag-success' },
-        2: { text: '维护中', class: 'tag-warning' }, 3: { text: '报废', class: 'tag-default' }
+        0: { text: '故障', class: 'tag-danger' }, 1: { text: '在线正常', class: 'tag-success' },
+        2: { text: '在线异常', class: 'tag-warning' }, 3: { text: '离线', class: 'tag-default' },
+        4: { text: '待检修', class: 'tag-info' }, 5: { text: '暂停运行', class: 'tag-default' }
     },
     alarmType: {
-        1: '灯具故障', 2: '电压异常', 3: '电流异常', 4: '通信故障', 5: '线缆异常', 6: '其他'
+        1: '灯具故障', 2: '电压异常', 3: '电流异常', 4: '通信故障', 5: '线缆异常', 6: '温度异常', 7: '漏电告警', 8: '其他'
     },
     alarmLevel: {
         1: { text: '低', class: 'tag-info' }, 2: { text: '中', class: 'tag-warning' },
@@ -169,6 +170,8 @@ function renderSidebar(activePage) {
         { section: '系统管理', roles: ['ADMIN'] },
         { icon: 'users', text: '用户管理', href: '/pages/users.html', id: 'users', roles: ['ADMIN'] },
         { icon: 'megaphone', text: '公告管理', href: '/pages/announcement.html', id: 'announcement', roles: ['ADMIN'] },
+        { section: 'IoT通信', roles: ['ADMIN', 'OPERATOR'] },
+        { icon: 'radio', text: 'MQTT通信', href: '/pages/mqtt.html', id: 'mqtt', roles: ['ADMIN', 'OPERATOR'] },
     ];
 
     let html = `

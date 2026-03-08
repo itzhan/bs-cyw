@@ -18,7 +18,10 @@
 <div class="card">
     <div class="card-header">
         <h3>路灯设备列表</h3>
-        <button class="btn btn-primary btn-sm" onclick="location.href='map.html'" id="mapViewBtn"><i data-lucide="map" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>地图查看</button>
+        <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="openForm()" id="addBtn" style="display:none"><i data-lucide="plus" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>新增路灯</button>
+            <button class="btn btn-primary btn-sm" onclick="location.href='map.html'" id="mapViewBtn"><i data-lucide="map" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>地图查看</button>
+        </div>
     </div>
     <div class="card-body">
         <div class="search-bar">
@@ -57,6 +60,38 @@
         <div class="modal-body" id="detailContent"></div>
     </div>
 </div>
+<!-- Create/Edit Modal -->
+<div class="modal-overlay" id="formModal">
+    <div class="modal" style="max-width:680px">
+        <div class="modal-header"><h3 id="formTitle">新增路灯</h3><button class="modal-close" onclick="closeModal('formModal')">✕</button></div>
+        <div class="modal-body">
+            <div class="grid-2">
+                <div class="form-group"><label class="form-label">编码 *</label><input class="form-input" id="fCode" required></div>
+                <div class="form-group"><label class="form-label">名称 *</label><input class="form-input" id="fName" required></div>
+                <div class="form-group"><label class="form-label">设备UID</label><input class="form-input" id="fDeviceUid" placeholder="MQTT设备标识"></div>
+                <div class="form-group"><label class="form-label">灯型</label><select class="form-select" id="fLampType"><option value="LED">LED</option><option value="钠灯">钠灯</option><option value="太阳能">太阳能</option></select></div>
+                <div class="form-group"><label class="form-label">功率(W)</label><input class="form-input" id="fPower" type="number"></div>
+                <div class="form-group"><label class="form-label">高度(m)</label><input class="form-input" id="fHeight" type="number" step="0.01"></div>
+                <div class="form-group"><label class="form-label">所属区域 *</label><select class="form-select" id="fAreaId"></select></div>
+                <div class="form-group"><label class="form-label">所属电柜</label><select class="form-select" id="fCabinetId"><option value="">无</option></select></div>
+                <div class="form-group"><label class="form-label">经度</label><input class="form-input" id="fLongitude" type="number" step="0.0000001"></div>
+                <div class="form-group"><label class="form-label">纬度</label><input class="form-input" id="fLatitude" type="number" step="0.0000001"></div>
+                <div class="form-group"><label class="form-label">硬件型号</label><input class="form-input" id="fHardwareModel"></div>
+                <div class="form-group"><label class="form-label">防护等级</label><input class="form-input" id="fProtectionRating" placeholder="如 IP65"></div>
+            </div>
+            <div class="form-group"><label class="form-label">安装地址</label><input class="form-input" id="fAddress"></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('formModal')">取消</button><button class="btn btn-primary" onclick="submitForm()">保存</button></div>
+    </div>
+</div>
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header"><h3>确认删除</h3><button class="modal-close" onclick="closeModal('deleteModal')">✕</button></div>
+        <div class="modal-body"><p>确定要删除该路灯设备吗？此操作不可恢复。</p></div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('deleteModal')">取消</button><button class="btn btn-danger" onclick="confirmDelete()">删除</button></div>
+    </div>
+</div>
         </div>
     </main>
 </div>
@@ -66,6 +101,28 @@
 <script>if(!initPage('device','路灯设备'))throw'';</script>
 <script>
 let currentPage = 1;
+let editId = null;
+let deleteId = null;
+let allAreas = [];
+let allCabinets = [];
+const isAdmin = hasRole('ADMIN');
+const isOperator = hasRole('OPERATOR');
+
+// Show add button for ADMIN
+if (isAdmin) document.getElementById('addBtn').style.display = '';
+
+// Load area & cabinet options for form
+async function loadFormOptions() {
+    try {
+        const [areaRes, cabRes] = await Promise.all([areaApi.list(), cabinetApi.list({page:1,size:100})]);
+        allAreas = areaRes.data || [];
+        allCabinets = (cabRes.data && cabRes.data.records) || cabRes.data || [];
+        document.getElementById('fAreaId').innerHTML = '<option value="">请选择</option>' + allAreas.map(a => `<option value="${a.id}">${a.name} (${a.code})</option>`).join('');
+        document.getElementById('fCabinetId').innerHTML = '<option value="">无</option>' + allCabinets.map(c => `<option value="${c.id}">${c.name} (${c.code})</option>`).join('');
+    } catch(e) { console.warn('加载选项失败', e); }
+}
+loadFormOptions();
+
 async function loadDevices(page) {
     currentPage = page || 1;
     try {
@@ -76,8 +133,11 @@ async function loadDevices(page) {
             onlineStatus: document.getElementById('filterOnline').value
         });
         const d = res.data;
-        document.getElementById('deviceTableBody').innerHTML = d.records.map(s => `
-            <tr>
+        document.getElementById('deviceTableBody').innerHTML = d.records.map(s => {
+            let actions = `<button class="btn btn-outline btn-sm" onclick="showDetail(${s.id})">详情</button>`;
+            if (isAdmin || isOperator) actions += ` <button class="btn btn-outline btn-sm" onclick="openEdit(${s.id})">编辑</button>`;
+            if (isAdmin) actions += ` <button class="btn btn-danger btn-sm" onclick="openDelete(${s.id})">删除</button>`;
+            return `<tr>
                 <td><code>${s.code}</code></td>
                 <td>${s.name}</td>
                 <td>${s.lampType||'-'}</td>
@@ -88,13 +148,15 @@ async function loadDevices(page) {
                 <td>${s.brightness}%</td>
                 <td>${s.voltage?s.voltage+'V':'-'}</td>
                 <td>${s.temperature?s.temperature+'℃':'-'}</td>
-                <td><button class="btn btn-outline btn-sm" onclick="showDetail(${s.id})">详情</button></td>
-            </tr>
-        `).join('') || '<tr><td colspan="11" class="text-center text-muted">暂无数据</td></tr>';
+                <td style="white-space:nowrap">${actions}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="11" class="text-center text-muted">暂无数据</td></tr>';
         renderPagination('pagination', d.total, d.page, d.size, loadDevices);
     } catch(err) { showToast(err.message,'error'); }
 }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ====== Detail ======
 async function showDetail(id) {
     try {
         const res = await lightApi.detail(id);
@@ -119,6 +181,91 @@ async function showDetail(id) {
         document.getElementById('detailModal').classList.add('show');
     } catch(err) { showToast(err.message,'error'); }
 }
+
+// ====== Create / Edit ======
+function clearForm() {
+    ['fCode','fName','fDeviceUid','fPower','fHeight','fLongitude','fLatitude','fHardwareModel','fProtectionRating','fAddress'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fLampType').value = 'LED';
+    document.getElementById('fAreaId').value = '';
+    document.getElementById('fCabinetId').value = '';
+}
+function openForm() {
+    editId = null;
+    clearForm();
+    document.getElementById('fCode').readOnly = false;
+    document.getElementById('formTitle').textContent = '新增路灯';
+    document.getElementById('formModal').classList.add('show');
+}
+async function openEdit(id) {
+    try {
+        const res = await lightApi.detail(id);
+        const s = res.data;
+        editId = id;
+        document.getElementById('formTitle').textContent = '编辑路灯';
+        document.getElementById('fCode').value = s.code || '';
+        document.getElementById('fCode').readOnly = true;
+        document.getElementById('fName').value = s.name || '';
+        document.getElementById('fDeviceUid').value = s.deviceUid || '';
+        document.getElementById('fLampType').value = s.lampType || 'LED';
+        document.getElementById('fPower').value = s.power || '';
+        document.getElementById('fHeight').value = s.height || '';
+        document.getElementById('fAreaId').value = s.areaId || '';
+        document.getElementById('fCabinetId').value = s.cabinetId || '';
+        document.getElementById('fLongitude').value = s.longitude || '';
+        document.getElementById('fLatitude').value = s.latitude || '';
+        document.getElementById('fHardwareModel').value = s.hardwareModel || '';
+        document.getElementById('fProtectionRating').value = s.protectionRating || '';
+        document.getElementById('fAddress').value = s.address || '';
+        document.getElementById('formModal').classList.add('show');
+    } catch(err) { showToast(err.message,'error'); }
+}
+async function submitForm() {
+    const code = document.getElementById('fCode').value.trim();
+    const name = document.getElementById('fName').value.trim();
+    const areaId = document.getElementById('fAreaId').value;
+    if (!code || !name) { showToast('编码和名称为必填项','warning'); return; }
+    if (!areaId) { showToast('请选择所属区域','warning'); return; }
+    const data = {
+        code, name,
+        deviceUid: document.getElementById('fDeviceUid').value.trim() || null,
+        lampType: document.getElementById('fLampType').value,
+        power: document.getElementById('fPower').value ? parseInt(document.getElementById('fPower').value) : null,
+        height: document.getElementById('fHeight').value ? parseFloat(document.getElementById('fHeight').value) : null,
+        areaId: parseInt(areaId),
+        cabinetId: document.getElementById('fCabinetId').value ? parseInt(document.getElementById('fCabinetId').value) : null,
+        longitude: document.getElementById('fLongitude').value ? parseFloat(document.getElementById('fLongitude').value) : null,
+        latitude: document.getElementById('fLatitude').value ? parseFloat(document.getElementById('fLatitude').value) : null,
+        hardwareModel: document.getElementById('fHardwareModel').value.trim() || null,
+        protectionRating: document.getElementById('fProtectionRating').value.trim() || null,
+        address: document.getElementById('fAddress').value.trim() || null
+    };
+    try {
+        if (editId) {
+            await lightApi.update(editId, data);
+            showToast('编辑成功','success');
+        } else {
+            await lightApi.create(data);
+            showToast('新增成功','success');
+        }
+        closeModal('formModal');
+        loadDevices(currentPage);
+    } catch(err) { showToast(err.message,'error'); }
+}
+
+// ====== Delete ======
+function openDelete(id) {
+    deleteId = id;
+    document.getElementById('deleteModal').classList.add('show');
+}
+async function confirmDelete() {
+    try {
+        await lightApi.delete(deleteId);
+        showToast('删除成功','success');
+        closeModal('deleteModal');
+        loadDevices(currentPage);
+    } catch(err) { showToast(err.message,'error'); }
+}
+
 loadDevices();
 </script>
 </body>

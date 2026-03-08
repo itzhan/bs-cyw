@@ -58,10 +58,14 @@ public class StreetlightController {
         Streetlight entity = streetlightRepository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("路灯不存在"));
         if (dto.getName() != null) entity.setName(dto.getName());
+        if (dto.getDeviceUid() != null) entity.setDeviceUid(dto.getDeviceUid());
         if (dto.getAddress() != null) entity.setAddress(dto.getAddress());
         if (dto.getLongitude() != null) entity.setLongitude(dto.getLongitude());
         if (dto.getLatitude() != null) entity.setLatitude(dto.getLatitude());
         if (dto.getLampType() != null) entity.setLampType(dto.getLampType());
+        if (dto.getHardwareModel() != null) entity.setHardwareModel(dto.getHardwareModel());
+        if (dto.getElectricalParams() != null) entity.setElectricalParams(dto.getElectricalParams());
+        if (dto.getProtectionRating() != null) entity.setProtectionRating(dto.getProtectionRating());
         if (dto.getPower() != null) entity.setPower(dto.getPower());
         if (dto.getHeight() != null) entity.setHeight(dto.getHeight());
         if (dto.getAreaId() != null) entity.setAreaId(dto.getAreaId());

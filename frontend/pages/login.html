@@ -518,7 +518,7 @@
                 <button type="submit" class="login-btn" id="loginBtn">登 录</button>
             </form>
             <div class="login-footer">
-                还没有账号？<a href="register.html">立即注册</a>
+                还没有账号？<a href="/pages/register.html">立即注册</a>
             </div>
             <div class="test-accounts">
                 <div class="test-title">测试账号（点击快速填入）</div>
@@ -572,7 +572,7 @@
         }
 
         // Redirect if already logged in
-        if (isLoggedIn()) location.href = 'dashboard.html';
+        if (isLoggedIn()) location.href = '/pages/dashboard.html';
 
         // Login form handler
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -586,15 +586,16 @@
                     password: document.getElementById('password').value
                 });
                 localStorage.setItem('token', res.data.token);
+                const user = res.data.user || {};
                 localStorage.setItem('user', JSON.stringify({
-                    userId: res.data.userId,
-                    username: res.data.username,
-                    realName: res.data.realName,
-                    avatar: res.data.avatar,
-                    roles: res.data.roles
+                    userId: user.id,
+                    username: user.username,
+                    realName: user.realName,
+                    avatar: user.avatar,
+                    roles: user.roles || []
                 }));
                 showToast('登录成功，正在跳转...', 'success');
-                setTimeout(() => location.href = 'dashboard.html', 500);
+                setTimeout(() => location.href = '/pages/dashboard.html', 500);
             } catch (err) {
                 showToast(err.message, 'error');
                 btn.disabled = false;

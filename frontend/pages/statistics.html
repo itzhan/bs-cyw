@@ -20,8 +20,8 @@
     <div class="card"><div class="card-header"><h3><i data-lucide="bell-ring" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>告警级别分布</h3></div><div class="card-body"><div id="alarmLevel" style="height:350px"></div></div></div>
 </div>
 <div class="charts-grid">
-    <div class="card"><div class="card-header"><h3>�� 各区域设备数</h3></div><div class="card-body"><div id="areaDevice" style="height:350px"></div></div></div>
-    <div class="card"><div class="card-header"><h3><i data-lucide="bell-ring" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>告警类型分阵</h3></div><div class="card-body"><div id="alarmType" style="height:350px"></div></div></div>
+    <div class="card"><div class="card-header"><h3><i data-lucide="map-pinned" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>各区域设备数</h3></div><div class="card-body"><div id="areaDevice" style="height:350px"></div></div></div>
+    <div class="card"><div class="card-header"><h3><i data-lucide="siren" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>告警类型分布</h3></div><div class="card-body"><div id="alarmType" style="height:350px"></div></div></div>
 </div>
         </div>
     </main>
@@ -32,20 +32,132 @@
 <script>if(!initPage('statistics','数据统计'))throw'';</script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <script>
-async function loadCharts(){
-    try{
-        const[energy,alLevel,alType,devArea]=await Promise.all([statsApi.energyDaily(),statsApi.alarmByLevel(),statsApi.alarmByType(),statsApi.deviceByArea()]);
-        const c1=echarts.init(document.getElementById('energyTrend'));
-        c1.setOption({tooltip:{trigger:'axis'},grid:{left:50,right:20,top:20,bottom:30},xAxis:{type:'category',data:energy.data.map(d=>d.date.substring(5)),axisLabel:{color:'#64748B'}},yAxis:{type:'value',name:'kWh',splitLine:{lineStyle:{color:'#F1F5F9'}},axisLabel:{color:'#64748B'}},series:[{type:'bar',data:energy.data.map(d=>Number(d.energy)),itemStyle:{borderRadius:[4,4,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#3B82F6'},{offset:1,color:'#93C5FD'}])}}]});
-        const c2=echarts.init(document.getElementById('alarmLevel'));
-        c2.setOption({tooltip:{trigger:'item'},legend:{bottom:0},color:['#3B82F6','#F59E0B','#EF4444','#DC2626'],series:[{type:'pie',radius:['35%','60%'],center:['50%','45%'],data:alLevel.data.map(d=>({name:d.levelName,value:d.count}))}]});
-        const c3=echarts.init(document.getElementById('areaDevice'));
-        c3.setOption({tooltip:{trigger:'axis'},grid:{left:50,right:20,top:20,bottom:30},xAxis:{type:'category',data:devArea.data.map(d=>'区域'+d.areaId),axisLabel:{color:'#64748B'}},yAxis:{type:'value',splitLine:{lineStyle:{color:'#F1F5F9'}}},series:[{type:'bar',data:devArea.data.map(d=>d.count),barWidth:30,itemStyle:{borderRadius:[4,4,0,0],color:'#1B3A5C'}}]});
-        const c4=echarts.init(document.getElementById('alarmType'));
-        c4.setOption({tooltip:{trigger:'item'},legend:{bottom:0},color:['#EF4444','#F59E0B','#3B82F6','#8B5CF6','#10B981','#6B7280'],series:[{type:'pie',radius:'55%',center:['50%','45%'],roseType:'area',data:alType.data.map(d=>({name:d.typeName,value:d.count}))}]});
-        window.addEventListener('resize',()=>{c1.resize();c2.resize();c3.resize();c4.resize();});
-    }catch(err){showToast(err.message,'error');}
+const chartInstances = [];
+
+function safeArray(v) {
+    return Array.isArray(v) ? v : [];
 }
+
+function createEmptyOption(title = '暂无数据') {
+    return {
+        title: {
+            text: title,
+            left: 'center',
+            top: 'middle',
+            textStyle: { color: '#94A3B8', fontSize: 14, fontWeight: 400 }
+        },
+        xAxis: { show: false },
+        yAxis: { show: false },
+        series: []
+    };
+}
+
+async function loadEnergyChart() {
+    const chart = echarts.init(document.getElementById('energyTrend'));
+    chartInstances.push(chart);
+    try {
+        const res = await statsApi.energyDaily();
+        const list = safeArray(res.data);
+        if (!list.length) return chart.setOption(createEmptyOption());
+        chart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 50, right: 20, top: 20, bottom: 30 },
+            xAxis: { type: 'category', data: list.map(d => (d.date || '').slice(5)), axisLabel: { color: '#64748B' } },
+            yAxis: { type: 'value', name: 'kWh', splitLine: { lineStyle: { color: '#F1F5F9' } }, axisLabel: { color: '#64748B' } },
+            series: [{
+                type: 'bar',
+                data: list.map(d => Number(d.energy || 0)),
+                itemStyle: {
+                    borderRadius: [4, 4, 0, 0],
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#3B82F6' }, { offset: 1, color: '#93C5FD' }])
+                }
+            }]
+        });
+    } catch (err) {
+        chart.setOption(createEmptyOption('能耗数据加载失败'));
+        console.error(err);
+    }
+}
+
+async function loadAlarmLevelChart() {
+    const chart = echarts.init(document.getElementById('alarmLevel'));
+    chartInstances.push(chart);
+    try {
+        const res = await statsApi.alarmByLevel();
+        const list = safeArray(res.data);
+        if (!list.length) return chart.setOption(createEmptyOption());
+        chart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0 },
+            color: ['#3B82F6', '#F59E0B', '#EF4444', '#DC2626'],
+            series: [{
+                type: 'pie',
+                radius: ['35%', '60%'],
+                center: ['50%', '45%'],
+                data: list.map(d => ({ name: d.levelName || `级别${d.level}`, value: d.count || 0 }))
+            }]
+        });
+    } catch (err) {
+        chart.setOption(createEmptyOption('告警级别加载失败'));
+        console.error(err);
+    }
+}
+
+async function loadAreaDeviceChart() {
+    const chart = echarts.init(document.getElementById('areaDevice'));
+    chartInstances.push(chart);
+    try {
+        const res = await statsApi.deviceByArea();
+        const list = safeArray(res.data);
+        if (!list.length) return chart.setOption(createEmptyOption());
+        chart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 50, right: 20, top: 20, bottom: 30 },
+            xAxis: { type: 'category', data: list.map(d => `区域${d.areaId}`), axisLabel: { color: '#64748B' } },
+            yAxis: { type: 'value', splitLine: { lineStyle: { color: '#F1F5F9' } } },
+            series: [{
+                type: 'bar',
+                data: list.map(d => d.count || 0),
+                barWidth: 30,
+                itemStyle: { borderRadius: [4, 4, 0, 0], color: '#1B3A5C' }
+            }]
+        });
+    } catch (err) {
+        chart.setOption(createEmptyOption('区域设备加载失败'));
+        console.error(err);
+    }
+}
+
+async function loadAlarmTypeChart() {
+    const chart = echarts.init(document.getElementById('alarmType'));
+    chartInstances.push(chart);
+    try {
+        const res = await statsApi.alarmByType();
+        const list = safeArray(res.data);
+        if (!list.length) return chart.setOption(createEmptyOption());
+        chart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0 },
+            color: ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#6B7280'],
+            series: [{
+                type: 'pie',
+                radius: '55%',
+                center: ['50%', '45%'],
+                roseType: 'area',
+                data: list.map(d => ({ name: d.typeName || `类型${d.type}`, value: d.count || 0 }))
+            }]
+        });
+    } catch (err) {
+        chart.setOption(createEmptyOption('告警类型加载失败'));
+        console.error(err);
+    }
+}
+
+async function loadCharts() {
+    await Promise.all([loadEnergyChart(), loadAlarmLevelChart(), loadAreaDeviceChart(), loadAlarmTypeChart()]);
+}
+
+window.addEventListener('resize', () => chartInstances.forEach(c => c.resize()));
 loadCharts();
 </script>
 </body>

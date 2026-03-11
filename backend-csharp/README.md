@@ -16,6 +16,17 @@
 - MySQL 8.0+
 - （可选）MQTT Broker
 
+## Docker 一键部署（推荐）
+
+项目根目录已提供前端 + C# 后端 + C 设备模拟器的一键编排：
+
+```bash
+cd /Users/itzhan/Desktop/毕业设计/陈勇忘
+DOCKER_BUILDKIT=0 docker compose up -d --build
+```
+
+详细说明见：`/Users/itzhan/Desktop/毕业设计/陈勇忘/README-docker-csharp-c.md`
+
 ## 快速启动
 
 ### 1. 安装 .NET 8 SDK
@@ -70,7 +81,7 @@ SmartStreetlight.Api/
 │   └── AppDbContext.cs           # EF Core DbContext
 ├── Services/
 │   ├── JwtService.cs             # JWT 生成
-│   └── MqttPublishService.cs     # MQTT 下发
+│   └── MqttPublishService.cs     # MQTT 上下行（下发 + 设备上报订阅入库）
 └── Controllers/                  # API 控制器（14个）
     ├── AuthController.cs
     ├── StreetlightController.cs

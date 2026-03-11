@@ -4,7 +4,6 @@
 *.docx
 *.doc
 *.md
-backend/swim-admin/target
 node_modules
 .idea
 .vscode

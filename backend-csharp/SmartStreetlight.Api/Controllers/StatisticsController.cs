@@ -56,12 +56,18 @@ public class StatisticsController : ControllerBase
         var start = startDate != null ? DateOnly.Parse(startDate) : DateOnly.FromDateTime(DateTime.Today.AddDays(-30));
         var end = endDate != null ? DateOnly.Parse(endDate) : DateOnly.FromDateTime(DateTime.Today);
 
-        var data = await _db.EnergyRecords
+        var rows = await _db.EnergyRecords
             .Where(e => e.RecordDate >= start && e.RecordDate <= end)
             .GroupBy(e => e.RecordDate)
-            .Select(g => new { date = g.Key.ToString("yyyy-MM-dd"), energy = g.Sum(e => e.EnergyKwh) })
-            .OrderBy(x => x.date)
+            .Select(g => new { recordDate = g.Key, energy = g.Sum(e => e.EnergyKwh) })
+            .OrderBy(x => x.recordDate)
             .ToListAsync();
+
+        var data = rows.Select(x => new
+        {
+            date = x.recordDate.ToString("yyyy-MM-dd"),
+            x.energy
+        });
         return Ok(Result<object>.Success(data));
     }
 

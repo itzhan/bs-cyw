@@ -1,55 +1,95 @@
-name: smartlight
+name: smartlight-csharp-c
 
 services:
-  # ========== MySQL ==========
   mysql:
     image: mysql:8.0
-    container_name: smartlight-mysql
+    container_name: smartlight-csharp-mysql
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: root123
       MYSQL_DATABASE: smart_streetlight
       MYSQL_CHARSET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
-    ports:
-      - "3307:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
-      - ./backend/swim-admin/sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql
-      - ./backend/swim-admin/sql/data.sql:/docker-entrypoint-initdb.d/02-data.sql
+      - mysql_data_csharp:/var/lib/mysql
+      - ./database/sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./database/sql/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
     healthcheck:
-      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123" ]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot123"]
       interval: 10s
       timeout: 5s
       retries: 10
 
-  # ========== Backend (Spring Boot) ==========
-  backend:
-    container_name: smartlight-backend
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: smartlight-csharp-mqtt
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "1884:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  backend:
+    container_name: smartlight-csharp-backend
+    build:
+      context: .
+      dockerfile: Dockerfile.backend-csharp
+    restart: unless-stopped
     depends_on:
       mysql:
         condition: service_healthy
+      mqtt:
+        condition: service_started
     environment:
       TZ: Asia/Shanghai
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      ConnectionStrings__DefaultConnection: Server=mysql;Port=3306;Database=smart_streetlight;User=root;Password=root123;CharSet=utf8mb4;
+      Mqtt__Enabled: "true"
+      Mqtt__BrokerUrl: mqtt
+      Mqtt__BrokerPort: "1883"
+      Mqtt__ClientId: smart-streetlight-server-csharp
 
-  # ========== Frontend (Nginx) ==========
   frontend:
-    container_name: smartlight-frontend
+    container_name: smartlight-csharp-frontend
     build:
       context: .
       dockerfile: Dockerfile.frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3001:80"
     depends_on:
       - backend
 
+  sim-device-1:
+    container_name: smartlight-c-sim-1
+    build:
+      context: ./device-simulator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mqtt
+    command: ["tcp://mqtt:1883", "DEV-HYL-001"]
+
+  sim-device-2:
+    container_name: smartlight-c-sim-2
+    build:
+      context: ./device-simulator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mqtt
+    command: ["tcp://mqtt:1883", "DEV-HYL-002"]
+
+  sim-device-3:
+    container_name: smartlight-c-sim-3
+    build:
+      context: ./device-simulator
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - mqtt
+    command: ["tcp://mqtt:1883", "DEV-JSL-014"]
+
 volumes:
-  mysql_data:
+  mysql_data_csharp:

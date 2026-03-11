@@ -5,6 +5,318 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MQTT通信 - 智慧路灯管理信息系统</title>
     <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .mqtt-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+        }
+        .mqtt-status-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: #fff;
+        }
+        .mqtt-status-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .mqtt-status-value {
+            font-size: 14px;
+            color: var(--text-primary);
+            font-weight: 600;
+            word-break: break-all;
+        }
+        .mqtt-send-layout {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .mqtt-send-panel {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr;
+            gap: 14px;
+            width: 100%;
+        }
+        .mqtt-send-left, .mqtt-send-right {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: #fff;
+        }
+        .mqtt-send-panel .form-control {
+            width: 100%;
+            height: 38px;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-primary);
+            background: #fff;
+            outline: none;
+            transition: var(--transition);
+        }
+        .mqtt-send-panel .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(27, 58, 92, 0.12);
+        }
+        .mqtt-step + .mqtt-step {
+            margin-top: 12px;
+        }
+        .mqtt-step-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            letter-spacing: .2px;
+        }
+        .mqtt-device-input-wrap {
+            position: relative;
+        }
+        .mqtt-device-input {
+            padding-left: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+        .mqtt-device-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(27, 58, 92, 0.12);
+        }
+        .mqtt-device-hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .mqtt-device-hint code {
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-size: 12px;
+            color: var(--text-primary);
+        }
+        .mqtt-device-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .mqtt-device-meta .mqtt-device-hint {
+            margin-top: 0;
+        }
+        .mqtt-device-count {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--bg-page);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 2px 8px;
+        }
+        .mqtt-device-quick {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .mqtt-device-chip {
+            border: 1px solid var(--border);
+            background: var(--bg-page);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .mqtt-device-chip:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .mqtt-device-chip.active {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: var(--primary-bg);
+            font-weight: 600;
+        }
+        .mqtt-action-group {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+        .mqtt-action-btn {
+            border: 1px solid var(--border);
+            background: #fff;
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 10px 8px;
+            cursor: pointer;
+            text-align: left;
+        }
+        .mqtt-action-btn b {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 2px;
+        }
+        .mqtt-action-btn span {
+            display: block;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .mqtt-action-btn.active {
+            border-color: var(--primary);
+            background: var(--primary-bg);
+        }
+        .mqtt-brightness-row {
+            display: grid;
+            grid-template-columns: 1fr 100px;
+            gap: 10px;
+            align-items: center;
+        }
+        .mqtt-range {
+            width: 100%;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+        .mqtt-dimmed {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        .mqtt-send-payload {
+            min-height: 94px;
+            resize: vertical;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .mqtt-builder-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+        }
+        .mqtt-presets {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+        }
+        .mqtt-preview-wrap {
+            margin-top: 10px;
+        }
+        .mqtt-preview-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        .mqtt-preview {
+            min-height: 96px;
+            max-height: 140px;
+            overflow: auto;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #0f172a;
+            font-size: 12px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+        .mqtt-send-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .mqtt-send-tip {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .mqtt-topic {
+            font-size: 12px;
+            color: var(--text-secondary);
+            word-break: break-all;
+            max-width: 260px;
+        }
+        .mqtt-summary {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 220px;
+        }
+        .mqtt-summary-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .mqtt-chip {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            background: var(--bg-page);
+            color: var(--text-secondary);
+            font-size: 12px;
+            border: 1px solid var(--border);
+        }
+        .mqtt-detail {
+            max-width: 360px;
+        }
+        .mqtt-detail summary {
+            cursor: pointer;
+            color: var(--primary);
+            font-size: 12px;
+        }
+        .mqtt-json {
+            margin-top: 8px;
+            max-height: 180px;
+            overflow: auto;
+            padding: 10px;
+            border-radius: 8px;
+            background: #0b1f33;
+            color: #dbeafe;
+            font-size: 12px;
+            line-height: 1.45;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .mqtt-json-inline {
+            margin-top: 0;
+            max-height: 140px;
+            background: #f8fafc;
+            color: #0f172a;
+            border: 1px solid var(--border);
+        }
+        .mqtt-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px 0;
+        }
+        @media (max-width: 768px) {
+            .mqtt-send-panel {
+                grid-template-columns: 1fr;
+            }
+            .mqtt-action-group {
+                grid-template-columns: 1fr;
+            }
+            .mqtt-send-actions {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .mqtt-send-tip {
+                order: 2;
+            }
+            .mqtt-detail {
+                max-width: 220px;
+            }
+            .mqtt-topic {
+                max-width: 170px;
+            }
+        }
+    </style>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="../js/utils.js" defer></script>
 </head>
@@ -18,11 +330,23 @@
             <div class="card" style="margin-bottom:20px">
                 <div class="card-header"><h3>MQTT 连接状态</h3></div>
                 <div class="card-body">
-                    <div style="display:flex;gap:32px;align-items:center;flex-wrap:wrap">
-                        <div><b>Broker：</b><span id="mqttBroker">-</span></div>
-                        <div><b>连接状态：</b><span id="mqttStatus" class="tag tag-default">加载中</span></div>
-                        <div><b>上行消息：</b><span id="mqttUplink">-</span></div>
-                        <div><b>下行消息：</b><span id="mqttDownlink">-</span></div>
+                    <div class="mqtt-status-grid">
+                        <div class="mqtt-status-item">
+                            <div class="mqtt-status-label">Broker</div>
+                            <div class="mqtt-status-value" id="mqttBroker">-</div>
+                        </div>
+                        <div class="mqtt-status-item">
+                            <div class="mqtt-status-label">连接状态</div>
+                            <div class="mqtt-status-value"><span id="mqttStatus" class="tag tag-default">加载中</span></div>
+                        </div>
+                        <div class="mqtt-status-item">
+                            <div class="mqtt-status-label">上行消息总数</div>
+                            <div class="mqtt-status-value" id="mqttUplink">-</div>
+                        </div>
+                        <div class="mqtt-status-item">
+                            <div class="mqtt-status-label">下行消息总数</div>
+                            <div class="mqtt-status-value" id="mqttDownlink">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -30,16 +354,64 @@
             <div class="card" style="margin-bottom:20px">
                 <div class="card-header"><h3>手动发送指令</h3></div>
                 <div class="card-body">
-                    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
-                        <div class="form-group" style="flex:1;min-width:160px">
-                            <label>设备UID</label>
-                            <input type="text" id="pubDeviceUid" placeholder="如 DEV-HYL-001" class="form-control">
+                    <div class="mqtt-send-panel">
+                        <div class="mqtt-send-left">
+                            <div class="mqtt-step">
+                                <div class="mqtt-step-title">步骤 1：选择设备</div>
+                                <div class="mqtt-device-input-wrap">
+                                    <input type="text" id="pubDeviceUid" list="deviceUidOptions" placeholder="输入设备UID，如 DEV-HYL-001" class="form-control mqtt-device-input" oninput="handleDeviceInput()">
+                                </div>
+                                <datalist id="deviceUidOptions">
+                                    <option value="DEV-HYL-001"></option>
+                                    <option value="DEV-HYL-002"></option>
+                                    <option value="DEV-JSL-014"></option>
+                                </datalist>
+                                <div class="mqtt-device-meta">
+                                    <div class="mqtt-device-hint">已选择：<code id="deviceSelectedText">未选择</code></div>
+                                    <div class="mqtt-device-count">可选设备 3 台</div>
+                                </div>
+                                <div class="mqtt-device-quick">
+                                    <button type="button" class="mqtt-device-chip" data-uid="DEV-HYL-001" onclick="quickSetDevice('DEV-HYL-001')">DEV-HYL-001</button>
+                                    <button type="button" class="mqtt-device-chip" data-uid="DEV-HYL-002" onclick="quickSetDevice('DEV-HYL-002')">DEV-HYL-002</button>
+                                    <button type="button" class="mqtt-device-chip" data-uid="DEV-JSL-014" onclick="quickSetDevice('DEV-JSL-014')">DEV-JSL-014</button>
+                                </div>
+                            </div>
+
+                            <div class="mqtt-step">
+                                <div class="mqtt-step-title">步骤 2：选择动作</div>
+                                <input type="hidden" id="pubAction" value="TURN_ON">
+                                <div class="mqtt-action-group" id="mqttActionGroup">
+                                    <button type="button" class="mqtt-action-btn active" data-action="TURN_ON" onclick="selectAction('TURN_ON')">
+                                        <b>开灯</b><span>TURN_ON</span>
+                                    </button>
+                                    <button type="button" class="mqtt-action-btn" data-action="TURN_OFF" onclick="selectAction('TURN_OFF')">
+                                        <b>关灯</b><span>TURN_OFF</span>
+                                    </button>
+                                    <button type="button" class="mqtt-action-btn" data-action="SET_BRIGHTNESS" onclick="selectAction('SET_BRIGHTNESS')">
+                                        <b>调光</b><span>SET_BRIGHTNESS</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="mqtt-step" id="brightnessStep">
+                                <div class="mqtt-step-title">步骤 3：设置亮度</div>
+                                <div class="mqtt-brightness-row">
+                                    <input type="range" id="pubBrightnessRange" class="mqtt-range" min="0" max="100" value="100" oninput="syncBrightnessFromRange()">
+                                    <input type="number" id="pubBrightness" class="form-control" min="0" max="100" value="100" oninput="syncBrightnessFromInput()">
+                                </div>
+                            </div>
                         </div>
-                        <div class="form-group" style="flex:2;min-width:250px">
-                            <label>Payload (JSON)</label>
-                            <input type="text" id="pubPayload" placeholder='{"action":"TURN_ON","brightness":100}' class="form-control">
+
+                        <div class="mqtt-send-right">
+                            <div class="mqtt-preview-wrap">
+                                <div class="mqtt-preview-label">将要发送的 Payload（JSON）</div>
+                                <pre id="pubPayloadPreview" class="mqtt-preview"></pre>
+                            </div>
+                            <div class="mqtt-send-actions">
+                                <div class="mqtt-send-tip">无需手写 JSON，按左侧步骤选择即可。</div>
+                                <button class="btn btn-primary" onclick="publishMsg()">发送指令</button>
+                            </div>
                         </div>
-                        <button class="btn btn-primary" onclick="publishMsg()">发送</button>
                     </div>
                 </div>
             </div>
@@ -60,7 +432,12 @@
                 <div class="card-body">
                     <table class="data-table">
                         <thead><tr>
-                            <th>时间</th><th>设备UID</th><th>方向</th><th>Topic</th><th>Payload</th><th>状态</th>
+                            <th style="width:140px">时间</th>
+                            <th style="width:130px">设备UID</th>
+                            <th style="width:160px">方向 / Topic</th>
+                            <th>数据摘要</th>
+                            <th style="width:220px">原始数据</th>
+                            <th style="width:80px">状态</th>
                         </tr></thead>
                         <tbody id="msgBody"></tbody>
                     </table>
@@ -74,9 +451,17 @@
     let currentPage = 1;
     document.addEventListener('DOMContentLoaded', () => {
         if (!initPage('mqtt', 'MQTT通信')) return;
+        initSendPanel();
+        renderPayloadPreview();
         loadStatus();
         loadMessages();
     });
+
+    function initSendPanel() {
+        const action = document.getElementById('pubAction').value || 'TURN_ON';
+        selectAction(action);
+        handleDeviceInput();
+    }
 
     function loadStatus() {
         fetch('/api/mqtt/status', { headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') } })
@@ -103,22 +488,161 @@
                 if (res.code !== 200) return;
                 const d = res.data;
                 const tbody = document.getElementById('msgBody');
-                tbody.innerHTML = (d.records || []).map(m => `<tr>
-                    <td>${formatDateTime(m.createdAt)}</td>
-                    <td><code>${m.deviceUid || '-'}</code></td>
-                    <td>${m.direction === 1 ? '<span class="tag tag-info">上行</span>' : '<span class="tag tag-warning">下行</span>'}</td>
-                    <td style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis">${m.topic}</td>
-                    <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;word-break:break-all">${m.payload || ''}</td>
-                    <td>${m.status === 1 ? '<span class="tag tag-success">成功</span>' : '<span class="tag tag-danger">失败</span>'}</td>
-                </tr>`).join('');
+                const records = d.records || [];
+                if (records.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="mqtt-empty">暂无消息</td></tr>';
+                } else {
+                    tbody.innerHTML = records.map(m => renderMessageRow(m)).join('');
+                }
                 renderPagination('pagination', d.total, d.page, d.size, p => { currentPage = p; loadMessages(); });
             }).catch(() => {});
     }
 
+    function buildPayloadFromForm() {
+        const action = document.getElementById('pubAction').value;
+        const brightnessRaw = Number(document.getElementById('pubBrightness').value);
+        const brightness = Number.isFinite(brightnessRaw) ? Math.max(0, Math.min(100, brightnessRaw)) : 100;
+        const payload = { action };
+        if (action === 'TURN_ON') payload.brightness = brightness || 100;
+        if (action === 'SET_BRIGHTNESS') payload.brightness = brightness;
+        return payload;
+    }
+
+    function normalizeDeviceUid(v) {
+        return (v || '').toUpperCase().replace(/\s+/g, '').trim();
+    }
+
+    function handleDeviceInput() {
+        const input = document.getElementById('pubDeviceUid');
+        const selectedEl = document.getElementById('deviceSelectedText');
+        const normalized = normalizeDeviceUid(input.value);
+        if (input.value !== normalized) input.value = normalized;
+        selectedEl.textContent = normalized || '未选择';
+        const chips = document.querySelectorAll('.mqtt-device-chip');
+        chips.forEach(chip => chip.classList.toggle('active', chip.dataset.uid === normalized));
+    }
+
+    function quickSetDevice(uid) {
+        document.getElementById('pubDeviceUid').value = uid;
+        handleDeviceInput();
+    }
+
+    function selectAction(action) {
+        document.getElementById('pubAction').value = action;
+        const actionBtns = document.querySelectorAll('#mqttActionGroup .mqtt-action-btn');
+        actionBtns.forEach(btn => btn.classList.toggle('active', btn.dataset.action === action));
+        const brightnessStep = document.getElementById('brightnessStep');
+        const isOff = action === 'TURN_OFF';
+        brightnessStep.classList.toggle('mqtt-dimmed', isOff);
+        renderPayloadPreview();
+    }
+
+    function syncBrightnessFromRange() {
+        const range = document.getElementById('pubBrightnessRange');
+        const num = document.getElementById('pubBrightness');
+        num.value = range.value;
+        renderPayloadPreview();
+    }
+
+    function syncBrightnessFromInput() {
+        const range = document.getElementById('pubBrightnessRange');
+        const num = document.getElementById('pubBrightness');
+        let v = Number(num.value);
+        if (!Number.isFinite(v)) v = 0;
+        v = Math.max(0, Math.min(100, v));
+        num.value = v;
+        range.value = v;
+        renderPayloadPreview();
+    }
+
+    function renderPayloadPreview() {
+        const payload = buildPayloadFromForm();
+        const preview = document.getElementById('pubPayloadPreview');
+        preview.textContent = JSON.stringify(payload, null, 2);
+        const action = payload.action;
+        const brightnessInput = document.getElementById('pubBrightness');
+        const brightnessRange = document.getElementById('pubBrightnessRange');
+        const isOff = action === 'TURN_OFF';
+        brightnessInput.disabled = isOff;
+        brightnessRange.disabled = isOff;
+    }
+
+    function parsePayload(payload) {
+        if (!payload || typeof payload !== 'string') return null;
+        try { return JSON.parse(payload); } catch (_) { return null; }
+    }
+
+    function escapeHtml(str) {
+        return String(str || '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+    }
+
+    function buildSummary(topic, payloadObj, rawPayload) {
+        if (!payloadObj) return `<div class="mqtt-summary-row"><span class="mqtt-chip">${escapeHtml((rawPayload || '').slice(0, 90) || '-')}</span></div>`;
+        if (topic && topic.includes('/status')) {
+            const chips = [];
+            chips.push(`电压 ${payloadObj.voltage ?? '-'}V`);
+            chips.push(`电流 ${payloadObj.current ?? '-'}A`);
+            chips.push(`温度 ${payloadObj.temperature ?? '-'}℃`);
+            chips.push(`亮度 ${payloadObj.brightness ?? '-'}%`);
+            chips.push(payloadObj.lightStatus === 1 ? '亮灯' : '关灯');
+            return `<div class="mqtt-summary-row">${chips.map(c => `<span class="mqtt-chip">${escapeHtml(c)}</span>`).join('')}</div>`;
+        }
+        if (topic && topic.includes('/control')) {
+            const actionTextMap = { TURN_ON: '开灯', TURN_OFF: '关灯', SET_BRIGHTNESS: '调光' };
+            const actionText = actionTextMap[payloadObj.action] || payloadObj.action || '未知动作';
+            const chips = [`动作 ${actionText}`];
+            if (payloadObj.brightness !== undefined) chips.push(`亮度 ${payloadObj.brightness}%`);
+            return `<div class="mqtt-summary-row">${chips.map(c => `<span class="mqtt-chip">${escapeHtml(c)}</span>`).join('')}</div>`;
+        }
+        if (topic && topic.includes('/alarm')) {
+            const chips = [];
+            chips.push(`告警类型 ${payloadObj.alarmType ?? '-'}`);
+            chips.push(`温度 ${payloadObj.temperature ?? '-'}℃`);
+            if (payloadObj.message) chips.push(payloadObj.message);
+            return `<div class="mqtt-summary-row">${chips.map(c => `<span class="mqtt-chip">${escapeHtml(c)}</span>`).join('')}</div>`;
+        }
+        const pairs = [];
+        if (payloadObj.action) pairs.push(`动作 ${payloadObj.action}`);
+        if (payloadObj.brightness !== undefined) pairs.push(`亮度 ${payloadObj.brightness}%`);
+        if (pairs.length === 0) pairs.push('JSON消息');
+        return `<div class="mqtt-summary-row">${pairs.map(c => `<span class="mqtt-chip">${escapeHtml(c)}</span>`).join('')}</div>`;
+    }
+
+    function buildPayloadDetails(payloadObj, rawPayload, rowId) {
+        const pretty = payloadObj ? JSON.stringify(payloadObj, null, 2) : (rawPayload || '-');
+        return `<pre class="mqtt-json mqtt-json-inline">${escapeHtml(pretty)}</pre>`;
+    }
+
+    function renderMessageRow(m) {
+        const payloadObj = parsePayload(m.payload);
+        const directionTag = m.direction === 1
+            ? '<span class="tag tag-info">上行</span>'
+            : '<span class="tag tag-warning">下行</span>';
+        const summaryHtml = buildSummary(m.topic || '', payloadObj, m.payload || '');
+        const detailHtml = buildPayloadDetails(payloadObj, m.payload || '', m.id || 0);
+        return `<tr>
+            <td>${formatDateTime(m.createdAt)}</td>
+            <td><code>${escapeHtml(m.deviceUid || '-')}</code></td>
+            <td>
+                ${directionTag}
+                <div class="mqtt-topic">${escapeHtml(m.topic || '-')}</div>
+            </td>
+            <td><div class="mqtt-summary">${summaryHtml}</div></td>
+            <td>${detailHtml}</td>
+            <td>${m.status === 1 ? '<span class="tag tag-success">成功</span>' : '<span class="tag tag-danger">失败</span>'}</td>
+        </tr>`;
+    }
+
     function publishMsg() {
-        const deviceUid = document.getElementById('pubDeviceUid').value.trim();
-        const payload = document.getElementById('pubPayload').value.trim();
-        if (!deviceUid || !payload) { showToast('请填写设备UID和Payload', 'warning'); return; }
+        const deviceUid = normalizeDeviceUid(document.getElementById('pubDeviceUid').value);
+        const payloadObj = buildPayloadFromForm();
+        const payload = JSON.stringify(payloadObj);
+        if (!deviceUid) { showToast('请填写设备UID', 'warning'); return; }
         fetch('/api/mqtt/publish', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },

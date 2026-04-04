@@ -42,18 +42,51 @@
         </div>
     </main>
 </div>
-<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+<!-- 工单详情弹窗 -->
+<div class="modal-overlay" id="detailModal"><div class="modal" style="max-width:650px">
+    <div class="modal-header"><h3>工单详情</h3><button class="modal-close" onclick="closeDetail()">✕</button></div>
+    <div class="modal-body" id="detailBody"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeDetail()">关闭</button></div>
+</div></div>
+<script src="../js/vendor/lucide.min.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/utils.js"></script>
 <script>if(!initPage('workorder','维修工单'))throw'';</script>
 <script>
 let currentPage=1;
 async function loadOrders(page){currentPage=page||1;try{const res=await orderApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value,status:document.getElementById('filterStatus').value});const d=res.data;
-document.getElementById('orderTableBody').innerHTML=d.records.map(w=>`<tr><td><code>${w.orderNo}</code></td><td>${w.title}</td><td>${statusTag('workOrderPriority',w.priority)}</td><td>${statusTag('workOrderStatus',w.status)}</td><td>${formatDateTime(w.createdAt)}</td><td><button class="btn btn-outline btn-sm" onclick="location.href='workorder.html?detail='+${w.id}">详情</button></td></tr>`).join('')||'<tr><td colspan="6" class="text-center text-muted">暂无工单</td></tr>';
+document.getElementById('orderTableBody').innerHTML=d.records.map(w=>`<tr><td><code>${w.orderNo}</code></td><td>${w.title}</td><td>${statusTag('workOrderPriority',w.priority)}</td><td>${statusTag('workOrderStatus',w.status)}</td><td>${formatDateTime(w.createdAt)}</td><td><button class="btn btn-outline btn-sm" onclick="showDetail(${w.id})">详情</button></td></tr>`).join('')||'<tr><td colspan="6" class="text-center text-muted">暂无工单</td></tr>';
 renderPagination('pagination',d.total,d.page,d.size,loadOrders);}catch(err){showToast(err.message,'error');}}
 function closeModal(id){document.getElementById(id).classList.remove('show');}
 function openCreate(){document.getElementById('createModal').classList.add('show');}
 async function submitCreate(){try{await orderApi.create({title:document.getElementById('woTitle').value,description:document.getElementById('woDesc').value,priority:parseInt(document.getElementById('woPriority').value)});showToast('创建成功','success');closeModal('createModal');loadOrders();}catch(err){showToast(err.message,'error');}}
+
+async function showDetail(id){
+    document.getElementById('detailBody').innerHTML='<div class="loading"><div class="spinner"></div></div>';
+    document.getElementById('detailModal').classList.add('show');
+    try{
+        const res=await orderApi.detail(id);
+        const w=res.data;
+        document.getElementById('detailBody').innerHTML=`
+        <table class="detail-table" style="width:100%;border-collapse:collapse">
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;width:120px;border-bottom:1px solid #F1F5F9">工单号</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9"><code>${w.orderNo}</code></td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">标题</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.title}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">优先级</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${statusTag('workOrderPriority',w.priority)}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">状态</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${statusTag('workOrderStatus',w.status)}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">问题描述</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.description||'-'}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">创建时间</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${formatDateTime(w.createdAt)}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">期望完成</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${formatDateTime(w.expectedFinish)}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">实际完成</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${formatDateTime(w.actualFinish)}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">维修内容</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.repairContent||'-'}</td></tr>
+            <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">维修费用</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.repairCost!=null?'¥'+Number(w.repairCost).toFixed(2):'-'}</td></tr>
+        </table>`;
+    }catch(err){document.getElementById('detailBody').innerHTML='<p style="color:#EF4444;text-align:center">加载失败: '+err.message+'</p>';}
+}
+function closeDetail(){document.getElementById('detailModal').classList.remove('show');history.replaceState(null,'',location.pathname);}
+
+// 页面加载时检查URL参数
+const urlParams=new URLSearchParams(location.search);
+if(urlParams.get('detail')){showDetail(parseInt(urlParams.get('detail')));}
 loadOrders();
 </script>
 </body>

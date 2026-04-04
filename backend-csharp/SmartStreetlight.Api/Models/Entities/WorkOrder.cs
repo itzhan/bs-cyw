@@ -54,11 +54,9 @@ public class WorkOrder
     public string? Images { get; set; }
 
     [Column("created_at")]
-    [JsonIgnore]
     public DateTime CreatedAt { get; set; } = DateTime.Now;
 
     [Column("updated_at")]
-    [JsonIgnore]
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 
     [ForeignKey("StreetlightId")]

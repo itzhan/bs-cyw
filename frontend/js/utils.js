@@ -170,6 +170,8 @@ function renderSidebar(activePage) {
         { section: '系统管理', roles: ['ADMIN'] },
         { icon: 'users', text: '用户管理', href: '/pages/users.html', id: 'users', roles: ['ADMIN'] },
         { icon: 'megaphone', text: '公告管理', href: '/pages/announcement.html', id: 'announcement', roles: ['ADMIN'] },
+        { section: 'IoT通信', roles: ['ADMIN', 'OPERATOR'] },
+        { icon: 'radio', text: 'MQTT通信', href: '/pages/mqtt.html', id: 'mqtt', roles: ['ADMIN', 'OPERATOR'] },
     ];
 
     let html = `

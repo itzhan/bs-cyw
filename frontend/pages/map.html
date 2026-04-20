@@ -182,17 +182,29 @@
     var allLights = [];
     var infoWindow = null;
 
-    // Color mapping for device status
+    // Color mapping for device status (0-5 per schema)
     var STATUS_COLORS = {
-        0: '#EF4444',  // Fault - red
-        1: '#10B981',  // Normal - green
-        2: '#F59E0B',  // Maintenance - yellow
-        3: '#94A3B8'   // Decommissioned - gray
+        0: '#EF4444',  // 故障 - red
+        1: '#10B981',  // 在线正常 - green
+        2: '#F59E0B',  // 在线异常 - orange
+        3: '#94A3B8',  // 离线 - gray
+        4: '#F59E0B',  // 待检修 - orange
+        5: '#94A3B8'   // 暂停运行 - gray
     };
 
     var DEVICE_STATUS_TEXT = {
-        0: '故障', 1: '正常', 2: '维护中', 3: '报废'
+        0: '故障', 1: '在线正常', 2: '在线异常', 3: '离线', 4: '待检修', 5: '暂停运行'
     };
+
+    // 真实呈现颜色
+    function resolveColor(l){
+        if (l.deviceStatus === 0) return '#EF4444';           // 故障优先红
+        if (l.onlineStatus === 0) return '#94A3B8';           // 离线灰
+        if (l.lightStatus === 0) return '#94A3B8';            // 关灯 → 也视为灰(符合"策略关灯全灰"的可视要求)
+        if (l.deviceStatus === 4 || l.deviceStatus === 2) return '#F59E0B'; // 维护/异常
+        if (l.deviceStatus === 5) return '#94A3B8';
+        return '#10B981';                                       // 亮灯+在线正常 = 绿
+    }
 
     // Build info window content
     function buildInfoContent(light) {
@@ -231,8 +243,7 @@
             var light = lights[i];
             if (!light.longitude || !light.latitude) continue;
 
-            var color = STATUS_COLORS[light.deviceStatus] || '#94A3B8';
-            if (light.onlineStatus === 0) color = '#94A3B8';
+            var color = resolveColor(light);
 
             var isLit = light.lightStatus === 1 && light.onlineStatus === 1;
             var radius = isLit ? 10 : 7;
@@ -272,8 +283,8 @@
 
         if (filter === 'online') filtered = allLights.filter(function(l) { return l.onlineStatus === 1 && l.deviceStatus === 1; });
         else if (filter === 'fault') filtered = allLights.filter(function(l) { return l.deviceStatus === 0; });
-        else if (filter === 'offline') filtered = allLights.filter(function(l) { return l.onlineStatus === 0; });
-        else if (filter === 'maintain') filtered = allLights.filter(function(l) { return l.deviceStatus === 2; });
+        else if (filter === 'offline') filtered = allLights.filter(function(l) { return l.onlineStatus === 0 || l.deviceStatus === 3; });
+        else if (filter === 'maintain') filtered = allLights.filter(function(l) { return l.deviceStatus === 4 || l.deviceStatus === 2; });
 
         addMarkers(filtered);
         if (markers.length > 0) map.setFitView(markers, false, [60, 60, 60, 60]);
@@ -284,8 +295,8 @@
         document.getElementById('statTotal').textContent = lights.length;
         document.getElementById('statOnline').textContent = lights.filter(function(l) { return l.onlineStatus === 1 && l.deviceStatus === 1; }).length;
         document.getElementById('statFault').textContent = lights.filter(function(l) { return l.deviceStatus === 0; }).length;
-        document.getElementById('statOffline').textContent = lights.filter(function(l) { return l.onlineStatus === 0; }).length;
-        document.getElementById('statMaint').textContent = lights.filter(function(l) { return l.deviceStatus === 2; }).length;
+        document.getElementById('statOffline').textContent = lights.filter(function(l) { return l.onlineStatus === 0 || l.deviceStatus === 3; }).length;
+        document.getElementById('statMaint').textContent = lights.filter(function(l) { return l.deviceStatus === 4 || l.deviceStatus === 2; }).length;
     }
 
     // Load devices and add to map

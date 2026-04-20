@@ -95,7 +95,7 @@ const STATUS_MAP = {
         3: { text: '高', class: 'tag-danger' }, 4: { text: '紧急', class: 'tag-danger' }
     },
     repairStatus: {
-        0: { text: '待审核', class: 'tag-default' }, 1: { text: '已受理', class: 'tag-info' },
+        0: { text: '待审核', class: 'tag-warning' }, 1: { text: '已审核', class: 'tag-success' },
         2: { text: '处理中', class: 'tag-warning' }, 3: { text: '已完成', class: 'tag-success' },
         4: { text: '已驳回', class: 'tag-danger' }
     },

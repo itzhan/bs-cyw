@@ -70,7 +70,7 @@ const api = {
     put(url, body) {
         return this.request(url, {
             method: 'PUT',
-            body: JSON.stringify(body)
+            body: JSON.stringify(body ?? {})
         });
     },
 
@@ -120,6 +120,9 @@ const areaApi = {
 const cabinetApi = {
     list: (params) => api.get('/cabinets', params),
     detail: (id) => api.get(`/cabinets/${id}`),
+    create: (data) => api.post('/cabinets', data),
+    update: (id, data) => api.put(`/cabinets/${id}`, data),
+    delete: (id) => api.delete(`/cabinets/${id}`),
 };
 
 // ====== Alarm API ======
@@ -127,6 +130,9 @@ const alarmApi = {
     list: (params) => api.get('/alarms', params),
     detail: (id) => api.get(`/alarms/${id}`),
     handle: (id, data) => api.put(`/alarms/${id}/handle`, data),
+    create: (data) => api.post('/alarms', data),
+    batchHandle: (data) => api.put('/alarms/batch-handle', data),
+    delete: (id) => api.delete(`/alarms/${id}`),
 };
 
 // ====== Work Order API ======
@@ -136,6 +142,7 @@ const orderApi = {
     create: (data) => api.post('/work-orders', data),
     update: (id, data) => api.put(`/work-orders/${id}`, data),
     updateStatus: (id, data) => api.put(`/work-orders/${id}/status`, data),
+    delete: (id) => api.delete(`/work-orders/${id}`),
 };
 
 // ====== Strategy API ======
@@ -172,6 +179,7 @@ const announceApi = {
     update: (id, data) => api.put(`/announcements/${id}`, data),
     publish: (id) => api.put(`/announcements/${id}/publish`),
     withdraw: (id) => api.put(`/announcements/${id}/withdraw`),
+    toggleTop: (id) => api.put(`/announcements/${id}/top`),
     delete: (id) => api.delete(`/announcements/${id}`),
 };
 
@@ -179,6 +187,7 @@ const announceApi = {
 const userApi = {
     list: (params) => api.get('/users', params),
     detail: (id) => api.get(`/users/${id}`),
+    create: (data) => api.post('/users', data),
     update: (id, data) => api.put(`/users/${id}`, data),
     delete: (id) => api.delete(`/users/${id}`),
     resetPassword: (id) => api.put(`/users/${id}/reset-password`),

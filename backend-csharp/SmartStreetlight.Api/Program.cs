@@ -55,6 +55,8 @@ builder.Services.AddAuthorization();
 // ====== Services ======
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddSingleton<MqttPublishService>();
+builder.Services.AddHostedService<EnergyAccumulatorService>();
+builder.Services.AddHostedService<StrategySchedulerService>();
 
 // ====== Controllers + JSON ======
 builder.Services.AddControllers()

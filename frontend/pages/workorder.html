@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>维修工单 - 城市智慧路灯管理系统</title>
     <link rel="stylesheet" href="../css/style.css">
-    
+
 </head>
 <body>
 <div class="app-layout">
@@ -14,60 +14,155 @@
         <header class="top-header" id="topHeader"></header>
         <div class="page-content">
             <h2 class="page-title">维修工单</h2>
-            
+
 <div class="card">
     <div class="card-header"><h3>维修工单</h3><button class="btn btn-primary btn-sm" onclick="openCreate()" id="createBtn">+ 新建工单</button></div>
     <div class="card-body">
         <div class="search-bar">
             <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="searchInput" placeholder="搜索工单..." onkeyup="if(event.key==='Enter')loadOrders()"></div>
-            <select class="form-select" id="filterStatus" style="width:120px" onchange="loadOrders()"><option value="">全部状态</option><option value="0">待分配</option><option value="1">已分配</option><option value="2">处理中</option><option value="3">已完成</option><option value="4">已关闭</option></select>
+            <select class="form-select" id="filterStatus" style="width:120px" onchange="loadOrders()"><option value="">全部状态</option><option value="0">待处理</option><option value="2">处理中</option><option value="3">已完成</option></select>
             <button class="btn btn-primary btn-sm" onclick="loadOrders()">查询</button>
         </div>
-        <div class="table-container"><table class="data-table"><thead><tr><th>工单号</th><th>标题</th><th>优先级</th><th>状态</th><th>创建时间</th><th>操作</th></tr></thead>
-        <tbody id="orderTableBody"><tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
+        <div class="table-container"><table class="data-table"><thead><tr><th>工单号</th><th>标题</th><th>优先级</th><th>状态</th><th>创建时间</th><th>完成时间</th><th>操作</th></tr></thead>
+        <tbody id="orderTableBody"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
         <div id="pagination"></div>
     </div>
 </div>
-<div class="modal-overlay" id="createModal"><div class="modal" style="max-width:600px">
-    <div class="modal-header"><h3>新建工单</h3><button class="modal-close" onclick="closeModal('createModal')">✕</button></div>
+
+<!-- 新建/编辑弹窗 -->
+<div class="modal-overlay" id="formModal"><div class="modal" style="max-width:640px">
+    <div class="modal-header"><h3 id="formTitle">新建工单</h3><button class="modal-close" onclick="closeModal('formModal')">✕</button></div>
     <div class="modal-body">
-        <div class="form-group"><label class="form-label">工单标题</label><input class="form-input" id="woTitle" required></div>
-        <div class="form-group"><label class="form-label">问题描述</label><textarea class="form-textarea" id="woDesc"></textarea></div>
+        <div class="form-group"><label class="form-label">工单标题 *</label><input class="form-input" id="woTitle"></div>
+        <div class="form-group"><label class="form-label">问题描述</label><textarea class="form-textarea" id="woDesc" rows="3"></textarea></div>
         <div class="grid-2">
             <div class="form-group"><label class="form-label">优先级</label><select class="form-select" id="woPriority"><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option><option value="4">紧急</option></select></div>
+            <div class="form-group" id="statusFieldWrap" style="display:none"><label class="form-label">状态</label><select class="form-select" id="woStatus"><option value="0">待处理</option><option value="2">处理中</option><option value="3">已完成</option></select></div>
         </div>
+        <div class="form-group" id="repairContentWrap" style="display:none"><label class="form-label">维修内容</label><textarea class="form-textarea" id="woRepair" rows="2"></textarea></div>
+        <div class="form-group" id="repairCostWrap" style="display:none"><label class="form-label">维修费用</label><input class="form-input" id="woCost" type="number" step="0.01"></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('createModal')">取消</button><button class="btn btn-primary" onclick="submitCreate()">提交</button></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('formModal')">取消</button><button class="btn btn-primary" onclick="submitForm()">保存</button></div>
 </div></div>
-        </div>
-    </main>
-</div>
+
 <!-- 工单详情弹窗 -->
 <div class="modal-overlay" id="detailModal"><div class="modal" style="max-width:650px">
     <div class="modal-header"><h3>工单详情</h3><button class="modal-close" onclick="closeDetail()">✕</button></div>
     <div class="modal-body" id="detailBody"><div class="loading"><div class="spinner"></div></div></div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeDetail()">关闭</button></div>
 </div></div>
+
+<!-- 删除确认 -->
+<div class="modal-overlay" id="deleteModal"><div class="modal" style="max-width:380px">
+    <div class="modal-header"><h3>确认删除</h3><button class="modal-close" onclick="closeModal('deleteModal')">✕</button></div>
+    <div class="modal-body"><p>确定要删除该工单吗？此操作不可恢复。</p></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('deleteModal')">取消</button><button class="btn btn-danger" onclick="confirmDelete()">删除</button></div>
+</div></div>
+        </div>
+    </main>
+</div>
 <script src="../js/vendor/lucide.min.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/utils.js"></script>
 <script>if(!initPage('workorder','维修工单'))throw'';</script>
 <script>
-let currentPage=1;
-async function loadOrders(page){currentPage=page||1;try{const res=await orderApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value,status:document.getElementById('filterStatus').value});const d=res.data;
-document.getElementById('orderTableBody').innerHTML=d.records.map(w=>`<tr><td><code>${w.orderNo}</code></td><td>${w.title}</td><td>${statusTag('workOrderPriority',w.priority)}</td><td>${statusTag('workOrderStatus',w.status)}</td><td>${formatDateTime(w.createdAt)}</td><td><button class="btn btn-outline btn-sm" onclick="showDetail(${w.id})">详情</button></td></tr>`).join('')||'<tr><td colspan="6" class="text-center text-muted">暂无工单</td></tr>';
-renderPagination('pagination',d.total,d.page,d.size,loadOrders);}catch(err){showToast(err.message,'error');}}
-function closeModal(id){document.getElementById(id).classList.remove('show');}
-function openCreate(){document.getElementById('createModal').classList.add('show');}
-async function submitCreate(){try{await orderApi.create({title:document.getElementById('woTitle').value,description:document.getElementById('woDesc').value,priority:parseInt(document.getElementById('woPriority').value)});showToast('创建成功','success');closeModal('createModal');loadOrders();}catch(err){showToast(err.message,'error');}}
+let currentPage=1, editId=null, editStatusOriginal=null, deleteId=null;
+const isAdmin = hasRole('ADMIN');
+const isOperator = hasRole('OPERATOR');
+
+async function loadOrders(page){
+    currentPage = page || 1;
+    try {
+        const res = await orderApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value,status:document.getElementById('filterStatus').value});
+        const d = res.data;
+        document.getElementById('orderTableBody').innerHTML = d.records.map(w => {
+            let actions = `<button class="btn btn-outline btn-sm" onclick="showDetail(${w.id})">详情</button>`;
+            if ((isAdmin || isOperator) && w.status !== 3) {
+                actions += ` <button class="btn btn-outline btn-sm" onclick="openEdit(${w.id})">编辑</button>`;
+                actions += ` <button class="btn btn-success btn-sm" onclick="markDone(${w.id})">标记完成</button>`;
+            }
+            if (isAdmin) actions += ` <button class="btn btn-danger btn-sm" onclick="openDelete(${w.id})">删除</button>`;
+            return `<tr><td><code>${w.orderNo}</code></td><td>${w.title}</td><td>${statusTag('workOrderPriority',w.priority)}</td><td>${statusTag('workOrderStatus',w.status)}</td><td>${formatDateTime(w.createdAt)}</td><td>${formatDateTime(w.actualFinish)}</td><td style="white-space:nowrap">${actions}</td></tr>`;
+        }).join('') || '<tr><td colspan="7" class="text-center text-muted">暂无工单</td></tr>';
+        renderPagination('pagination', d.total, d.page, d.size, loadOrders);
+    } catch(err){ showToast(err.message,'error'); }
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+function clearForm(){
+    document.getElementById('woTitle').value='';
+    document.getElementById('woDesc').value='';
+    document.getElementById('woPriority').value='2';
+    document.getElementById('woStatus').value='0';
+    document.getElementById('woRepair').value='';
+    document.getElementById('woCost').value='';
+}
+
+function openCreate(){
+    editId = null; editStatusOriginal = null;
+    clearForm();
+    document.getElementById('formTitle').textContent = '新建工单';
+    document.getElementById('statusFieldWrap').style.display = 'none';
+    document.getElementById('repairContentWrap').style.display = 'none';
+    document.getElementById('repairCostWrap').style.display = 'none';
+    document.getElementById('formModal').classList.add('show');
+}
+
+async function openEdit(id){
+    try {
+        const res = await orderApi.detail(id);
+        const w = res.data;
+        editId = id;
+        editStatusOriginal = w.status;
+        document.getElementById('formTitle').textContent = '编辑工单';
+        document.getElementById('woTitle').value = w.title || '';
+        document.getElementById('woDesc').value = w.description || '';
+        document.getElementById('woPriority').value = String(w.priority || 2);
+        document.getElementById('woStatus').value = String(w.status ?? 0);
+        document.getElementById('woRepair').value = w.repairContent || '';
+        document.getElementById('woCost').value = w.repairCost ?? '';
+        document.getElementById('statusFieldWrap').style.display = '';
+        document.getElementById('repairContentWrap').style.display = '';
+        document.getElementById('repairCostWrap').style.display = '';
+        document.getElementById('formModal').classList.add('show');
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+async function submitForm(){
+    const title = document.getElementById('woTitle').value.trim();
+    if (!title){ showToast('标题不能为空','warning'); return; }
+    const data = {
+        title,
+        description: document.getElementById('woDesc').value || null,
+        priority: parseInt(document.getElementById('woPriority').value),
+        repairContent: document.getElementById('woRepair').value || null,
+        repairCost: document.getElementById('woCost').value ? parseFloat(document.getElementById('woCost').value) : null
+    };
+    try {
+        if (editId){
+            await orderApi.update(editId, data);
+            // 状态变更单独提交
+            const newStatus = parseInt(document.getElementById('woStatus').value);
+            if (newStatus !== editStatusOriginal) {
+                await orderApi.updateStatus(editId, { status: newStatus });
+            }
+            showToast('编辑成功','success');
+        } else {
+            await orderApi.create(data);
+            showToast('创建成功','success');
+        }
+        closeModal('formModal');
+        loadOrders(currentPage);
+    } catch(err){ showToast(err.message,'error'); }
+}
 
 async function showDetail(id){
     document.getElementById('detailBody').innerHTML='<div class="loading"><div class="spinner"></div></div>';
     document.getElementById('detailModal').classList.add('show');
     try{
-        const res=await orderApi.detail(id);
-        const w=res.data;
-        document.getElementById('detailBody').innerHTML=`
+        const res = await orderApi.detail(id);
+        const w = res.data;
+        document.getElementById('detailBody').innerHTML = `
         <table class="detail-table" style="width:100%;border-collapse:collapse">
             <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;width:120px;border-bottom:1px solid #F1F5F9">工单号</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9"><code>${w.orderNo}</code></td></tr>
             <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">标题</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.title}</td></tr>
@@ -80,13 +175,23 @@ async function showDetail(id){
             <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">维修内容</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.repairContent||'-'}</td></tr>
             <tr><td style="padding:10px 12px;font-weight:600;color:#64748B;border-bottom:1px solid #F1F5F9">维修费用</td><td style="padding:10px 12px;border-bottom:1px solid #F1F5F9">${w.repairCost!=null?'¥'+Number(w.repairCost).toFixed(2):'-'}</td></tr>
         </table>`;
-    }catch(err){document.getElementById('detailBody').innerHTML='<p style="color:#EF4444;text-align:center">加载失败: '+err.message+'</p>';}
+    }catch(err){ document.getElementById('detailBody').innerHTML='<p style="color:#EF4444;text-align:center">加载失败: '+err.message+'</p>'; }
 }
-function closeDetail(){document.getElementById('detailModal').classList.remove('show');history.replaceState(null,'',location.pathname);}
+function closeDetail(){ document.getElementById('detailModal').classList.remove('show'); history.replaceState(null,'',location.pathname); }
 
-// 页面加载时检查URL参数
+async function markDone(id){
+    if (!confirm('确认将该工单标记为已完成?标记后状态将锁定不可更改。')) return;
+    try { await orderApi.updateStatus(id, { status: 3 }); showToast('工单已完成','success'); loadOrders(currentPage); }
+    catch(err){ showToast(err.message,'error'); }
+}
+function openDelete(id){ deleteId = id; document.getElementById('deleteModal').classList.add('show'); }
+async function confirmDelete(){
+    try { await orderApi.delete(deleteId); showToast('删除成功','success'); closeModal('deleteModal'); loadOrders(currentPage); }
+    catch(err){ showToast(err.message,'error'); }
+}
+
 const urlParams=new URLSearchParams(location.search);
-if(urlParams.get('detail')){showDetail(parseInt(urlParams.get('detail')));}
+if(urlParams.get('detail')){ showDetail(parseInt(urlParams.get('detail'))); }
 loadOrders();
 </script>
 </body>

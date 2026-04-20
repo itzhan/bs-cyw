@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>系统公告 - 城市智慧路灯管理系统</title>
+    <title>公告管理 - 城市智慧路灯管理系统</title>
     <link rel="stylesheet" href="../css/style.css">
-    
 </head>
 <body>
 <div class="app-layout">
@@ -13,11 +12,53 @@
     <main class="main-content">
         <header class="top-header" id="topHeader"></header>
         <div class="page-content">
-            <h2 class="page-title">系统公告</h2>
-            
+            <h2 class="page-title">公告管理</h2>
+
 <div class="card">
-    <div class="card-header"><h3>系统公告</h3></div>
-    <div class="card-body" id="announceContent"><div class="loading"><div class="spinner"></div></div></div>
+    <div class="card-header">
+        <h3>系统公告</h3>
+        <button class="btn btn-primary btn-sm" onclick="openCreate()" id="createBtn" style="display:none">+ 新增公告</button>
+    </div>
+    <div class="card-body">
+        <div class="search-bar">
+            <select class="form-select" id="filterStatus" style="width:140px" onchange="loadList()">
+                <option value="">全部状态</option><option value="0">草稿</option><option value="1">已发布</option><option value="2">已撤回</option>
+            </select>
+            <select class="form-select" id="filterType" style="width:140px" onchange="loadList()">
+                <option value="">全部类型</option><option value="1">系统通知</option><option value="2">维护公告</option><option value="3">政策通知</option>
+            </select>
+        </div>
+        <div class="table-container"><table class="data-table">
+            <thead><tr><th>ID</th><th>标题</th><th>类型</th><th>状态</th><th>置顶</th><th>发布时间</th><th>操作</th></tr></thead>
+            <tbody id="tbody"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+        </table></div>
+        <div id="pagination"></div>
+    </div>
+</div>
+
+<!-- 表单弹窗 -->
+<div class="modal-overlay" id="formModal">
+    <div class="modal" style="max-width:680px">
+        <div class="modal-header"><h3 id="formTitle">新增公告</h3><button class="modal-close" onclick="closeModal('formModal')">✕</button></div>
+        <div class="modal-body">
+            <div class="form-group"><label class="form-label">标题 *</label><input class="form-input" id="fTitle"></div>
+            <div class="grid-2">
+                <div class="form-group"><label class="form-label">类型</label><select class="form-select" id="fType"><option value="1">系统通知</option><option value="2">维护公告</option><option value="3">政策通知</option></select></div>
+                <div class="form-group"><label class="form-label">置顶</label><select class="form-select" id="fTop"><option value="0">否</option><option value="1">是</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">内容</label><textarea class="form-textarea" id="fContent" rows="6"></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('formModal')">取消</button><button class="btn btn-primary" onclick="submitForm()">保存</button></div>
+    </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width:380px">
+        <div class="modal-header"><h3>确认删除</h3><button class="modal-close" onclick="closeModal('deleteModal')">✕</button></div>
+        <div class="modal-body"><p>确定要删除该公告吗？此操作不可恢复。</p></div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('deleteModal')">取消</button><button class="btn btn-danger" onclick="confirmDelete()">删除</button></div>
+    </div>
 </div>
         </div>
     </main>
@@ -25,21 +66,110 @@
 <script src="../js/vendor/lucide.min.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/utils.js"></script>
-<script>if(!initPage('announcement','系统公告'))throw'';</script>
+<script>if(!initPage('announcement','公告管理'))throw'';</script>
 <script>
-async function loadAnnouncements(){try{const res=await announceApi.published();
-document.getElementById('announceContent').innerHTML=res.data.map(a=>`
-    <div style="padding:16px 0;border-bottom:1px solid var(--border-light)">
-        <div class="flex items-center gap-8 mb-16">
-            ${a.topFlag===1?'<span class="tag tag-danger" style="font-size:10px">置顶</span>':''}
-            <h3 style="font-size:15px">${a.title}</h3>
-            <span class="tag ${['','tag-info','tag-warning','tag-success'][a.type]||'tag-default'}" style="font-size:11px">${STATUS_MAP.announcementType[a.type]||''}</span>
-        </div>
-        <p style="font-size:13px;color:var(--text-secondary);line-height:1.8">${a.content||''}</p>
-        <div class="text-muted" style="margin-top:8px;font-size:12px">发布时间：${formatDateTime(a.publishTime)}</div>
-    </div>`).join('')||'<div class="empty-state"><p>暂无公告</p></div>';
-}catch(err){showToast(err.message,'error');}}
-loadAnnouncements();
+let currentPage=1, editId=null, deleteId=null;
+const isAdmin = hasRole('ADMIN');
+if (isAdmin) document.getElementById('createBtn').style.display = '';
+
+async function loadList(page){
+    currentPage = page || 1;
+    try {
+        const apiCall = isAdmin
+          ? announceApi.list({page:currentPage,size:10,status:document.getElementById('filterStatus').value,type:document.getElementById('filterType').value})
+          : announceApi.published().then(r=>({data:{records:r.data||[],total:(r.data||[]).length,page:1,size:50}}));
+        const res = await apiCall;
+        const d = res.data;
+        document.getElementById('tbody').innerHTML = (d.records||[]).map(a => {
+            let actions = '';
+            if (isAdmin) {
+                actions = `<button class="btn btn-outline btn-sm" onclick="openEdit(${a.id})">编辑</button>
+                    <button class="btn btn-sm ${a.topFlag===1?'btn-warning':'btn-outline'}" onclick="toggleTopItem(${a.id})">${a.topFlag===1?'取消置顶':'置顶'}</button>
+                    ${a.status!==1?`<button class="btn btn-success btn-sm" onclick="publishItem(${a.id})">发布</button>`:''}
+                    ${a.status===1?`<button class="btn btn-warning btn-sm" onclick="withdrawItem(${a.id})">撤回</button>`:''}
+                    <button class="btn btn-danger btn-sm" onclick="openDelete(${a.id})">删除</button>`;
+            } else { actions = '-'; }
+            return `<tr>
+                <td>${a.id}</td>
+                <td>${a.title}</td>
+                <td>${(STATUS_MAP.announcementType&&STATUS_MAP.announcementType[a.type])||'-'}</td>
+                <td>${statusTag('announcementStatus',a.status)}</td>
+                <td>${a.topFlag===1?'<span class="tag tag-danger">📌 置顶</span>':'-'}</td>
+                <td>${formatDateTime(a.publishTime)}</td>
+                <td style="white-space:nowrap">${actions}</td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="7" class="text-center text-muted">暂无公告</td></tr>';
+        renderPagination('pagination', d.total, d.page, d.size, loadList);
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+async function toggleTopItem(id){
+    try{ await announceApi.toggleTop(id); showToast('已更新置顶','success'); loadList(currentPage); }
+    catch(err){ showToast(err.message,'error'); }
+}
+
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+function clearForm(){
+    document.getElementById('fTitle').value='';
+    document.getElementById('fContent').value='';
+    document.getElementById('fType').value='1';
+    document.getElementById('fTop').value='0';
+}
+
+function openCreate(){
+    editId=null; clearForm();
+    document.getElementById('formTitle').textContent='新增公告';
+    document.getElementById('formModal').classList.add('show');
+}
+
+async function openEdit(id){
+    try {
+        const res = await announceApi.detail(id);
+        const a = res.data;
+        editId = id;
+        document.getElementById('formTitle').textContent='编辑公告';
+        document.getElementById('fTitle').value = a.title || '';
+        document.getElementById('fContent').value = a.content || '';
+        document.getElementById('fType').value = String(a.type || 1);
+        document.getElementById('fTop').value = String(a.topFlag || 0);
+        document.getElementById('formModal').classList.add('show');
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+async function submitForm(){
+    const title = document.getElementById('fTitle').value.trim();
+    if (!title){ showToast('标题不能为空','warning'); return; }
+    const data = {
+        title,
+        content: document.getElementById('fContent').value,
+        type: parseInt(document.getElementById('fType').value),
+        topFlag: parseInt(document.getElementById('fTop').value)
+    };
+    try {
+        if (editId) { await announceApi.update(editId, data); showToast('编辑成功','success'); }
+        else { await announceApi.create(data); showToast('新增成功','success'); }
+        closeModal('formModal');
+        loadList(currentPage);
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+async function publishItem(id){
+    try { await announceApi.publish(id); showToast('已发布','success'); loadList(currentPage); }
+    catch(err){ showToast(err.message,'error'); }
+}
+async function withdrawItem(id){
+    try { await announceApi.withdraw(id); showToast('已撤回','success'); loadList(currentPage); }
+    catch(err){ showToast(err.message,'error'); }
+}
+
+function openDelete(id){ deleteId = id; document.getElementById('deleteModal').classList.add('show'); }
+async function confirmDelete(){
+    try { await announceApi.delete(deleteId); showToast('删除成功','success'); closeModal('deleteModal'); loadList(currentPage); }
+    catch(err){ showToast(err.message,'error'); }
+}
+
+loadList();
 </script>
 </body>
 </html>

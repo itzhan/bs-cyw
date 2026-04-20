@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>用户管理 - 城市智慧路灯管理系统</title>
     <link rel="stylesheet" href="../css/style.css">
-    
+
 </head>
 <body>
 <div class="app-layout">
@@ -14,14 +14,45 @@
         <header class="top-header" id="topHeader"></header>
         <div class="page-content">
             <h2 class="page-title">用户管理</h2>
-            
+
 <div class="card">
-    <div class="card-header"><h3>用户管理</h3></div>
+    <div class="card-header">
+        <h3>用户管理</h3>
+        <button class="btn btn-primary btn-sm" onclick="openCreate()">+ 新增用户</button>
+    </div>
     <div class="card-body">
         <div class="search-bar"><div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="searchInput" placeholder="搜索用户..." onkeyup="if(event.key==='Enter')loadUsers()"></div><button class="btn btn-primary btn-sm" onclick="loadUsers()">查询</button></div>
         <div class="table-container"><table class="data-table"><thead><tr><th>ID</th><th>用户名</th><th>姓名</th><th>手机</th><th>角色</th><th>状态</th><th>最后登录</th><th>操作</th></tr></thead>
         <tbody id="userTableBody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
         <div id="pagination"></div>
+    </div>
+</div>
+
+<!-- 用户表单弹窗 -->
+<div class="modal-overlay" id="formModal">
+    <div class="modal" style="max-width:560px">
+        <div class="modal-header"><h3 id="formTitle">新增用户</h3><button class="modal-close" onclick="closeModal('formModal')">✕</button></div>
+        <div class="modal-body">
+            <div class="grid-2">
+                <div class="form-group"><label class="form-label">用户名 *</label><input class="form-input" id="fUsername"></div>
+                <div class="form-group"><label class="form-label" id="pwdLabel">初始密码</label><input class="form-input" id="fPassword" placeholder="留空则默认 123456"></div>
+                <div class="form-group"><label class="form-label">姓名</label><input class="form-input" id="fRealName"></div>
+                <div class="form-group"><label class="form-label">手机</label><input class="form-input" id="fPhone"></div>
+                <div class="form-group"><label class="form-label">邮箱</label><input class="form-input" id="fEmail"></div>
+                <div class="form-group"><label class="form-label">状态</label><select class="form-select" id="fStatus"><option value="1">启用</option><option value="0">禁用</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">角色</label><div id="roleCheckList" style="display:flex;gap:14px;flex-wrap:wrap;padding:8px 0"></div></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('formModal')">取消</button><button class="btn btn-primary" onclick="submitForm()">保存</button></div>
+    </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width:380px">
+        <div class="modal-header"><h3>确认删除</h3><button class="modal-close" onclick="closeModal('deleteModal')">✕</button></div>
+        <div class="modal-body"><p>确定要删除该用户吗？此操作不可恢复。</p></div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('deleteModal')">取消</button><button class="btn btn-danger" onclick="confirmDelete()">删除</button></div>
     </div>
 </div>
         </div>
@@ -32,11 +63,129 @@
 <script src="../js/utils.js"></script>
 <script>if(!initPage('users','用户管理'))throw'';</script>
 <script>
-let currentPage=1;
-async function loadUsers(page){currentPage=page||1;try{const res=await userApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value});const d=res.data;
-document.getElementById('userTableBody').innerHTML=d.records.map(u=>`<tr><td>${u.id}</td><td>${u.username}</td><td>${u.realName||'-'}</td><td>${u.phone||'-'}</td><td>${(u.roles||[]).map(r=>r.description||r.name).join(', ')}</td><td>${u.status===1?'<span class="tag tag-success">启用</span>':'<span class="tag tag-default">禁用</span>'}</td><td>${formatDateTime(u.lastLoginTime)}</td><td><button class="btn btn-outline btn-sm" onclick="resetPwd(${u.id})">重置密码</button></td></tr>`).join('');
-renderPagination('pagination',d.total,d.page,d.size,loadUsers);}catch(err){showToast(err.message,'error');}}
-async function resetPwd(id){if(!confirm('确定重置该用户密码为123456?'))return;try{await userApi.resetPassword(id);showToast('密码已重置为123456','success');}catch(err){showToast(err.message,'error');}}
+let currentPage=1, editId=null, deleteId=null, allRoles=[];
+
+async function loadRoles(){
+    try { const r = await roleApi.list(); allRoles = r.data || []; } catch(e){ console.warn(e); }
+}
+loadRoles();
+
+async function loadUsers(page){
+    currentPage = page || 1;
+    try {
+        const res = await userApi.list({page:currentPage,size:10,keyword:document.getElementById('searchInput').value});
+        const d = res.data;
+        document.getElementById('userTableBody').innerHTML = d.records.map(u => `
+            <tr>
+                <td>${u.id}</td>
+                <td>${u.username}</td>
+                <td>${u.realName||'-'}</td>
+                <td>${u.phone||'-'}</td>
+                <td>${(u.roles||[]).map(r=>r.description||r.name).join(', ')||'-'}</td>
+                <td>${u.status===1?'<span class="tag tag-success">启用</span>':'<span class="tag tag-default">禁用</span>'}</td>
+                <td>${formatDateTime(u.lastLoginTime)}</td>
+                <td style="white-space:nowrap">
+                    <button class="btn btn-outline btn-sm" onclick="openEdit(${u.id})">编辑</button>
+                    <button class="btn btn-outline btn-sm" onclick="resetPwd(${u.id})">重置密码</button>
+                    <button class="btn btn-danger btn-sm" onclick="openDelete(${u.id})">删除</button>
+                </td>
+            </tr>`).join('') || '<tr><td colspan="8" class="text-center text-muted">暂无数据</td></tr>';
+        renderPagination('pagination', d.total, d.page, d.size, loadUsers);
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+async function resetPwd(id){
+    if(!confirm('确定重置该用户密码为123456?')) return;
+    try { await userApi.resetPassword(id); showToast('密码已重置为123456','success'); }
+    catch(err){ showToast(err.message,'error'); }
+}
+
+function renderRoleCheckboxes(checkedIds){
+    const set = new Set((checkedIds||[]).map(Number));
+    document.getElementById('roleCheckList').innerHTML = allRoles.map(r =>
+        `<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" value="${r.id}" ${set.has(Number(r.id))?'checked':''}> ${r.description||r.name}</label>`
+    ).join('') || '<span class="text-muted">暂无角色</span>';
+}
+
+function getCheckedRoleIds(){
+    return Array.from(document.querySelectorAll('#roleCheckList input:checked')).map(i => parseInt(i.value));
+}
+
+function clearForm(){
+    ['fUsername','fPassword','fRealName','fPhone','fEmail'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('fStatus').value = '1';
+}
+
+function openCreate(){
+    editId = null;
+    clearForm();
+    document.getElementById('formTitle').textContent = '新增用户';
+    document.getElementById('fUsername').readOnly = false;
+    document.getElementById('pwdLabel').textContent = '初始密码';
+    document.getElementById('fPassword').parentElement.style.display = '';
+    renderRoleCheckboxes([]);
+    document.getElementById('formModal').classList.add('show');
+}
+
+async function openEdit(id){
+    try {
+        const res = await userApi.detail(id);
+        const u = res.data;
+        editId = id;
+        document.getElementById('formTitle').textContent = '编辑用户';
+        document.getElementById('fUsername').value = u.username;
+        document.getElementById('fUsername').readOnly = true;
+        document.getElementById('fPassword').parentElement.style.display = 'none';
+        document.getElementById('fRealName').value = u.realName || '';
+        document.getElementById('fPhone').value = u.phone || '';
+        document.getElementById('fEmail').value = u.email || '';
+        document.getElementById('fStatus').value = String(u.status);
+        renderRoleCheckboxes((u.roles||[]).map(r => r.id));
+        document.getElementById('formModal').classList.add('show');
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+async function submitForm(){
+    const username = document.getElementById('fUsername').value.trim();
+    if (!username){ showToast('用户名为必填项','warning'); return; }
+    const data = {
+        realName: document.getElementById('fRealName').value.trim() || null,
+        phone: document.getElementById('fPhone').value.trim() || null,
+        email: document.getElementById('fEmail').value.trim() || null,
+        status: parseInt(document.getElementById('fStatus').value),
+        roleIds: getCheckedRoleIds()
+    };
+    try {
+        if (editId) {
+            await userApi.update(editId, data);
+            showToast('编辑成功','success');
+        } else {
+            data.username = username;
+            data.password = document.getElementById('fPassword').value || null;
+            await userApi.create(data);
+            showToast('新增成功','success');
+        }
+        closeModal('formModal');
+        loadUsers(currentPage);
+    } catch(err){ showToast(err.message,'error'); }
+}
+
+function openDelete(id){
+    deleteId = id;
+    document.getElementById('deleteModal').classList.add('show');
+}
+
+async function confirmDelete(){
+    try {
+        await userApi.delete(deleteId);
+        showToast('删除成功','success');
+        closeModal('deleteModal');
+        loadUsers(currentPage);
+    } catch(err){ showToast(err.message,'error'); }
+}
+
 loadUsers();
 </script>
 </body>

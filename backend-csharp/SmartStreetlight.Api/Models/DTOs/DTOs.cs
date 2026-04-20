@@ -31,6 +31,17 @@ public class UserUpdateDTO
     public long[]? RoleIds { get; set; }
 }
 
+public class UserCreateDTO
+{
+    public string Username { get; set; } = "";
+    public string? Password { get; set; }
+    public string? RealName { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public int Status { get; set; } = 1;
+    public long[]? RoleIds { get; set; }
+}
+
 public class ControlDTO
 {
     public List<long>? StreetlightIds { get; set; }
@@ -42,6 +53,35 @@ public class ControlDTO
 
 public class AlarmHandleDTO
 {
+    public int Status { get; set; }
+    public string? HandleRemark { get; set; }
+}
+
+public class AlarmCreateDTO
+{
+    public int Type { get; set; } = 8;
+    public int Level { get; set; } = 2;
+    public long? StreetlightId { get; set; }
+    public long? CabinetId { get; set; }
+    public long? AreaId { get; set; }
+    public string Title { get; set; } = "";
+    public string? Description { get; set; }
+}
+
+public class RepairHandleDTO
+{
+    public int Status { get; set; }
+    public string? Reply { get; set; }
+}
+
+public class WorkOrderStatusDTO
+{
+    public int Status { get; set; }
+}
+
+public class AlarmBatchHandleDTO
+{
+    public long[] Ids { get; set; } = Array.Empty<long>();
     public int Status { get; set; }
     public string? HandleRemark { get; set; }
 }

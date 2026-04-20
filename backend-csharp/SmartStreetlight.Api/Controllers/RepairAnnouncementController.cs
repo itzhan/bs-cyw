@@ -78,13 +78,36 @@ public class RepairReportController : ControllerBase
 
     [HttpPut("{id}/handle")]
     [Authorize(Roles = "ADMIN,OPERATOR")]
-    public async Task<IActionResult> Handle(long id, [FromBody] Dictionary<string, object> body)
+    public async Task<IActionResult> Handle(long id, [FromBody] RepairHandleDTO dto)
     {
         var entity = await _db.RepairReports.FindAsync(id);
         if (entity == null) return Ok(Result.Error(404, "报修不存在"));
 
-        if (body.TryGetValue("status", out var s)) entity.Status = Convert.ToInt32(s);
-        if (body.TryGetValue("reply", out var r)) entity.Reply = r?.ToString();
+        var oldStatus = entity.Status;
+        entity.Status = dto.Status;
+        if (dto.Reply != null) entity.Reply = dto.Reply;
+
+        // 审核通过(status=1) 自动创建维修工单
+        if (oldStatus == 0 && entity.Status == 1 && entity.WorkOrderId == null)
+        {
+            var now = DateTime.Now;
+            var order = new WorkOrder
+            {
+                OrderNo = $"WO-{now:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..4].ToUpper()}",
+                RepairReportId = entity.Id,
+                StreetlightId = entity.StreetlightId,
+                Title = $"报修:{entity.Address ?? entity.ReportNo}",
+                Description = entity.Description,
+                Priority = 2,
+                Status = 2, // 处理中
+                ReporterId = entity.ReporterId,
+                CreatedAt = now
+            };
+            _db.WorkOrders.Add(order);
+            await _db.SaveChangesAsync();
+            entity.WorkOrderId = order.Id;
+        }
+
         await _db.SaveChangesAsync();
         return Ok(Result.Success());
     }
@@ -172,6 +195,17 @@ public class AnnouncementController : ControllerBase
         entity.Status = 2;
         await _db.SaveChangesAsync();
         return Ok(Result.Success());
+    }
+
+    [HttpPut("{id}/top")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> ToggleTop(long id)
+    {
+        var entity = await _db.Announcements.FindAsync(id);
+        if (entity == null) return Ok(Result.Error(404, "公告不存在"));
+        entity.TopFlag = entity.TopFlag == 1 ? 0 : 1;
+        await _db.SaveChangesAsync();
+        return Ok(Result<object>.Success(new { topFlag = entity.TopFlag }));
     }
 
     [HttpDelete("{id}")]

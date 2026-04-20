@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>数据统计 - 城市智慧路灯管理系统</title>
     <link rel="stylesheet" href="../css/style.css">
-    
 </head>
 <body>
 <div class="app-layout">
@@ -14,14 +13,10 @@
         <header class="top-header" id="topHeader"></header>
         <div class="page-content">
             <h2 class="page-title">数据统计</h2>
-            
+
 <div class="charts-grid">
-    <div class="card"><div class="card-header"><h3><i data-lucide="bar-chart-3" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>能耗趋势</h3></div><div class="card-body"><div id="energyTrend" style="height:350px"></div></div></div>
-    <div class="card"><div class="card-header"><h3><i data-lucide="bell-ring" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>告警级别分布</h3></div><div class="card-body"><div id="alarmLevel" style="height:350px"></div></div></div>
-</div>
-<div class="charts-grid">
-    <div class="card"><div class="card-header"><h3><i data-lucide="map-pinned" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>各区域设备数</h3></div><div class="card-body"><div id="areaDevice" style="height:350px"></div></div></div>
-    <div class="card"><div class="card-header"><h3><i data-lucide="siren" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>告警类型分布</h3></div><div class="card-body"><div id="alarmType" style="height:350px"></div></div></div>
+    <div class="card"><div class="card-header"><h3><i data-lucide="bar-chart-3" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>近30天能耗趋势</h3></div><div class="card-body"><div id="energyTrend" style="height:350px"></div></div></div>
+    <div class="card"><div class="card-header"><h3><i data-lucide="lightbulb" style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px"></i>设备类型统计</h3></div><div class="card-body"><div id="deviceChart" style="height:350px"></div></div></div>
 </div>
         </div>
     </main>
@@ -33,132 +28,45 @@
 <script src="../js/vendor/echarts.min.js"></script>
 <script>
 const chartInstances = [];
+function emptyOpt(t='暂无数据'){return{title:{text:t,left:'center',top:'middle',textStyle:{color:'#94A3B8'}},xAxis:{show:false},yAxis:{show:false},series:[]};}
 
-function safeArray(v) {
-    return Array.isArray(v) ? v : [];
-}
-
-function createEmptyOption(title = '暂无数据') {
-    return {
-        title: {
-            text: title,
-            left: 'center',
-            top: 'middle',
-            textStyle: { color: '#94A3B8', fontSize: 14, fontWeight: 400 }
-        },
-        xAxis: { show: false },
-        yAxis: { show: false },
-        series: []
-    };
-}
-
-async function loadEnergyChart() {
+async function loadEnergyChart(){
     const chart = echarts.init(document.getElementById('energyTrend'));
     chartInstances.push(chart);
-    try {
+    try{
         const res = await statsApi.energyDaily();
-        const list = safeArray(res.data);
-        if (!list.length) return chart.setOption(createEmptyOption());
+        const list = Array.isArray(res.data)?res.data:[];
+        if(!list.length) return chart.setOption(emptyOpt());
         chart.setOption({
-            tooltip: { trigger: 'axis' },
-            grid: { left: 50, right: 20, top: 20, bottom: 30 },
-            xAxis: { type: 'category', data: list.map(d => (d.date || '').slice(5)), axisLabel: { color: '#64748B' } },
-            yAxis: { type: 'value', name: 'kWh', splitLine: { lineStyle: { color: '#F1F5F9' } }, axisLabel: { color: '#64748B' } },
-            series: [{
-                type: 'bar',
-                data: list.map(d => Number(d.energy || 0)),
-                itemStyle: {
-                    borderRadius: [4, 4, 0, 0],
-                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: '#3B82F6' }, { offset: 1, color: '#93C5FD' }])
-                }
-            }]
+            tooltip:{trigger:'axis',formatter:'{b}<br/>能耗: {c} kWh'},
+            grid:{left:50,right:20,top:20,bottom:30},
+            xAxis:{type:'category',data:list.map(d=>(d.date||'').slice(5)),axisLabel:{color:'#64748B'}},
+            yAxis:{type:'value',name:'kWh',splitLine:{lineStyle:{color:'#F1F5F9'}},axisLabel:{color:'#64748B'}},
+            series:[{type:'line',smooth:true,data:list.map(d=>Number(d.energy||0)),lineStyle:{color:'#3B82F6',width:2.5},areaStyle:{color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'rgba(59,130,246,0.2)'},{offset:1,color:'rgba(59,130,246,0.02)'}])},itemStyle:{color:'#3B82F6'}}]
         });
-    } catch (err) {
-        chart.setOption(createEmptyOption('能耗数据加载失败'));
-        console.error(err);
-    }
+    }catch(e){chart.setOption(emptyOpt('能耗加载失败'));}
 }
 
-async function loadAlarmLevelChart() {
-    const chart = echarts.init(document.getElementById('alarmLevel'));
+async function loadDeviceChart(){
+    const chart = echarts.init(document.getElementById('deviceChart'));
     chartInstances.push(chart);
-    try {
-        const res = await statsApi.alarmByLevel();
-        const list = safeArray(res.data);
-        if (!list.length) return chart.setOption(createEmptyOption());
+    try{
+        const res = await statsApi.deviceByType();
+        const list = Array.isArray(res.data)?res.data:[];
+        if(!list.length) return chart.setOption(emptyOpt());
         chart.setOption({
-            tooltip: { trigger: 'item' },
-            legend: { bottom: 0 },
-            color: ['#3B82F6', '#F59E0B', '#EF4444', '#DC2626'],
-            series: [{
-                type: 'pie',
-                radius: ['35%', '60%'],
-                center: ['50%', '45%'],
-                data: list.map(d => ({ name: d.levelName || `级别${d.level}`, value: d.count || 0 }))
-            }]
+            tooltip:{trigger:'axis'},
+            grid:{left:60,right:20,top:20,bottom:30},
+            xAxis:{type:'category',data:list.map(d=>d.lampType||'未知'),axisLabel:{color:'#64748B'}},
+            yAxis:{type:'value',splitLine:{lineStyle:{color:'#F1F5F9'}},axisLabel:{color:'#64748B'}},
+            series:[{type:'bar',data:list.map(d=>d.count),barWidth:40,itemStyle:{borderRadius:[6,6,0,0],color:new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#1B3A5C'},{offset:1,color:'#2A5580'}])}}]
         });
-    } catch (err) {
-        chart.setOption(createEmptyOption('告警级别加载失败'));
-        console.error(err);
-    }
+    }catch(e){chart.setOption(emptyOpt('设备加载失败'));}
 }
 
-async function loadAreaDeviceChart() {
-    const chart = echarts.init(document.getElementById('areaDevice'));
-    chartInstances.push(chart);
-    try {
-        const res = await statsApi.deviceByArea();
-        const list = safeArray(res.data);
-        if (!list.length) return chart.setOption(createEmptyOption());
-        chart.setOption({
-            tooltip: { trigger: 'axis' },
-            grid: { left: 50, right: 20, top: 20, bottom: 30 },
-            xAxis: { type: 'category', data: list.map(d => `区域${d.areaId}`), axisLabel: { color: '#64748B' } },
-            yAxis: { type: 'value', splitLine: { lineStyle: { color: '#F1F5F9' } } },
-            series: [{
-                type: 'bar',
-                data: list.map(d => d.count || 0),
-                barWidth: 30,
-                itemStyle: { borderRadius: [4, 4, 0, 0], color: '#1B3A5C' }
-            }]
-        });
-    } catch (err) {
-        chart.setOption(createEmptyOption('区域设备加载失败'));
-        console.error(err);
-    }
-}
-
-async function loadAlarmTypeChart() {
-    const chart = echarts.init(document.getElementById('alarmType'));
-    chartInstances.push(chart);
-    try {
-        const res = await statsApi.alarmByType();
-        const list = safeArray(res.data);
-        if (!list.length) return chart.setOption(createEmptyOption());
-        chart.setOption({
-            tooltip: { trigger: 'item' },
-            legend: { bottom: 0 },
-            color: ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#6B7280'],
-            series: [{
-                type: 'pie',
-                radius: '55%',
-                center: ['50%', '45%'],
-                roseType: 'area',
-                data: list.map(d => ({ name: d.typeName || `类型${d.type}`, value: d.count || 0 }))
-            }]
-        });
-    } catch (err) {
-        chart.setOption(createEmptyOption('告警类型加载失败'));
-        console.error(err);
-    }
-}
-
-async function loadCharts() {
-    await Promise.all([loadEnergyChart(), loadAlarmLevelChart(), loadAreaDeviceChart(), loadAlarmTypeChart()]);
-}
-
-window.addEventListener('resize', () => chartInstances.forEach(c => c.resize()));
-loadCharts();
+window.addEventListener('resize',()=>chartInstances.forEach(c=>c.resize()));
+loadEnergyChart();
+loadDeviceChart();
 </script>
 </body>
 </html>

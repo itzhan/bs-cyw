@@ -244,6 +244,13 @@
     loadAlarmChart();
     loadDeviceChart();
     loadAnnouncements();
+
+    // 每 15 秒轮询刷新统计卡片(实现工单/报修/告警实时联动)
+    setInterval(loadOverview, 15000);
+    // 每 60 秒刷新告警饼图(匹配告警中心新建/批处理)
+    setInterval(loadAlarmChart, 60000);
+    // 每 60 秒刷新能耗(匹配能耗累计服务)
+    setInterval(loadEnergyChart, 60000);
 </script>
 </body>
 </html>

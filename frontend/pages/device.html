@@ -45,9 +45,9 @@
         <div class="table-container">
             <table class="data-table">
                 <thead><tr>
-                    <th>编码</th><th>名称</th><th>灯型</th><th>功率(W)</th><th>在线</th><th>亮灯</th><th>设备状态</th><th>亮度</th><th>电压</th><th>温度</th><th>操作</th>
+                    <th>编码</th><th>名称</th><th>灯型</th><th>功率(W)</th><th>在线</th><th>亮灯</th><th>设备状态</th><th>亮度</th><th>操作</th>
                 </tr></thead>
-                <tbody id="deviceTableBody"><tr><td colspan="11"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+                <tbody id="deviceTableBody"><tr><td colspan="9"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
             </table>
         </div>
         <div id="pagination"></div>
@@ -73,11 +73,8 @@
                 <div class="form-group"><label class="form-label">功率(W)</label><input class="form-input" id="fPower" type="number"></div>
                 <div class="form-group"><label class="form-label">高度(m)</label><input class="form-input" id="fHeight" type="number" step="0.01"></div>
                 <div class="form-group"><label class="form-label">所属区域 *</label><select class="form-select" id="fAreaId"></select></div>
-                <div class="form-group"><label class="form-label">所属电柜</label><select class="form-select" id="fCabinetId"><option value="">无</option></select></div>
                 <div class="form-group"><label class="form-label">经度</label><input class="form-input" id="fLongitude" type="number" step="0.0000001"></div>
                 <div class="form-group"><label class="form-label">纬度</label><input class="form-input" id="fLatitude" type="number" step="0.0000001"></div>
-                <div class="form-group"><label class="form-label">硬件型号</label><input class="form-input" id="fHardwareModel"></div>
-                <div class="form-group"><label class="form-label">防护等级</label><input class="form-input" id="fProtectionRating" placeholder="如 IP65"></div>
             </div>
             <div class="form-group"><label class="form-label">安装地址</label><input class="form-input" id="fAddress"></div>
         </div>
@@ -146,11 +143,9 @@ async function loadDevices(page) {
                 <td>${statusTag('lightStatus',s.lightStatus)}</td>
                 <td>${statusTag('deviceStatus',s.deviceStatus)}</td>
                 <td>${s.brightness}%</td>
-                <td>${s.voltage?s.voltage+'V':'-'}</td>
-                <td>${s.temperature?s.temperature+'℃':'-'}</td>
                 <td style="white-space:nowrap">${actions}</td>
             </tr>`;
-        }).join('') || '<tr><td colspan="11" class="text-center text-muted">暂无数据</td></tr>';
+        }).join('') || '<tr><td colspan="9" class="text-center text-muted">暂无数据</td></tr>';
         renderPagination('pagination', d.total, d.page, d.size, loadDevices);
     } catch(err) { showToast(err.message,'error'); }
 }
@@ -184,10 +179,9 @@ async function showDetail(id) {
 
 // ====== Create / Edit ======
 function clearForm() {
-    ['fCode','fName','fDeviceUid','fPower','fHeight','fLongitude','fLatitude','fHardwareModel','fProtectionRating','fAddress'].forEach(id => document.getElementById(id).value = '');
+    ['fCode','fName','fDeviceUid','fPower','fHeight','fLongitude','fLatitude','fAddress'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fLampType').value = 'LED';
     document.getElementById('fAreaId').value = '';
-    document.getElementById('fCabinetId').value = '';
 }
 function openForm() {
     editId = null;
@@ -210,11 +204,8 @@ async function openEdit(id) {
         document.getElementById('fPower').value = s.power || '';
         document.getElementById('fHeight').value = s.height || '';
         document.getElementById('fAreaId').value = s.areaId || '';
-        document.getElementById('fCabinetId').value = s.cabinetId || '';
         document.getElementById('fLongitude').value = s.longitude || '';
         document.getElementById('fLatitude').value = s.latitude || '';
-        document.getElementById('fHardwareModel').value = s.hardwareModel || '';
-        document.getElementById('fProtectionRating').value = s.protectionRating || '';
         document.getElementById('fAddress').value = s.address || '';
         document.getElementById('formModal').classList.add('show');
     } catch(err) { showToast(err.message,'error'); }
@@ -232,11 +223,8 @@ async function submitForm() {
         power: document.getElementById('fPower').value ? parseInt(document.getElementById('fPower').value) : null,
         height: document.getElementById('fHeight').value ? parseFloat(document.getElementById('fHeight').value) : null,
         areaId: parseInt(areaId),
-        cabinetId: document.getElementById('fCabinetId').value ? parseInt(document.getElementById('fCabinetId').value) : null,
         longitude: document.getElementById('fLongitude').value ? parseFloat(document.getElementById('fLongitude').value) : null,
         latitude: document.getElementById('fLatitude').value ? parseFloat(document.getElementById('fLatitude').value) : null,
-        hardwareModel: document.getElementById('fHardwareModel').value.trim() || null,
-        protectionRating: document.getElementById('fProtectionRating').value.trim() || null,
         address: document.getElementById('fAddress').value.trim() || null
     };
     try {

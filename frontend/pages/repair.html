@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>报修申请 - 城市智慧路灯管理系统</title>
+    <title>报修管理 - 城市智慧路灯管理系统</title>
     <link rel="stylesheet" href="../css/style.css">
-    
 </head>
 <body>
 <div class="app-layout">
@@ -13,20 +12,28 @@
     <main class="main-content">
         <header class="top-header" id="topHeader"></header>
         <div class="page-content">
-            <h2 class="page-title">报修申请</h2>
-            
+            <h2 class="page-title">报修管理</h2>
+
 <div class="card mb-24">
-    <div class="card-header"><h3>我的报修</h3><button class="btn btn-primary btn-sm" onclick="openReport()">+ 提交报修</button></div>
+    <div class="card-header">
+        <h3 id="cardTitle">我的报修</h3>
+        <div>
+            <button class="btn btn-outline btn-sm" id="viewToggleBtn" onclick="toggleView()" style="display:none">切换至全部报修</button>
+            <button class="btn btn-primary btn-sm" onclick="openReport()">+ 提交报修</button>
+        </div>
+    </div>
     <div class="card-body">
-        <div class="table-container"><table class="data-table"><thead><tr><th>报修号</th><th>地址</th><th>描述</th><th>状态</th><th>回复</th><th>提交时间</th></tr></thead>
-        <tbody id="myReportBody"><tr><td colspan="6"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
+        <div class="table-container"><table class="data-table"><thead><tr><th>报修号</th><th>地址</th><th>描述</th><th>联系人</th><th>联系电话</th><th>状态</th><th>回复</th><th>提交时间</th><th>操作</th></tr></thead>
+        <tbody id="reportBody"><tr><td colspan="9"><div class="loading"><div class="spinner"></div></div></td></tr></tbody></table></div>
     </div>
 </div>
+
+<!-- 提交报修 -->
 <div class="modal-overlay" id="reportModal"><div class="modal" style="max-width:560px">
     <div class="modal-header"><h3>提交报修</h3><button class="modal-close" onclick="closeModal('reportModal')">✕</button></div>
     <div class="modal-body">
-        <div class="form-group"><label class="form-label">故障地址</label><input class="form-input" id="rAddress" placeholder="请输入故障所在位置" required></div>
-        <div class="form-group"><label class="form-label">问题描述</label><textarea class="form-textarea" id="rDesc" placeholder="请详细描述故障情况" required></textarea></div>
+        <div class="form-group"><label class="form-label">故障地址 *</label><input class="form-input" id="rAddress" placeholder="请输入故障所在位置"></div>
+        <div class="form-group"><label class="form-label">问题描述 *</label><textarea class="form-textarea" id="rDesc" placeholder="请详细描述故障情况"></textarea></div>
         <div class="grid-2">
             <div class="form-group"><label class="form-label">联系人</label><input class="form-input" id="rName"></div>
             <div class="form-group"><label class="form-label">联系电话</label><input class="form-input" id="rPhone"></div>
@@ -34,20 +41,119 @@
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('reportModal')">取消</button><button class="btn btn-primary" onclick="submitReport()">提交</button></div>
 </div></div>
+
+<!-- 审核 -->
+<div class="modal-overlay" id="reviewModal"><div class="modal" style="max-width:480px">
+    <div class="modal-header"><h3 id="reviewTitle">审核报修</h3><button class="modal-close" onclick="closeModal('reviewModal')">✕</button></div>
+    <div class="modal-body">
+        <input type="hidden" id="reviewId">
+        <input type="hidden" id="reviewStatus">
+        <div class="form-group"><label class="form-label">回复说明</label><textarea class="form-textarea" id="reviewReply" placeholder="通过/拒绝的说明"></textarea></div>
+        <p class="text-muted" id="reviewHint"></p>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('reviewModal')">取消</button><button class="btn btn-primary" onclick="submitReview()">确认</button></div>
+</div></div>
+
+<!-- 详情 -->
+<div class="modal-overlay" id="detailModal"><div class="modal" style="max-width:580px">
+    <div class="modal-header"><h3>报修详情</h3><button class="modal-close" onclick="closeModal('detailModal')">✕</button></div>
+    <div class="modal-body" id="detailBody"></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('detailModal')">关闭</button></div>
+</div></div>
+
         </div>
     </main>
 </div>
 <script src="../js/vendor/lucide.min.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/utils.js"></script>
-<script>if(!initPage('repair','报修申请'))throw'';</script>
+<script>if(!initPage('repair','报修管理'))throw'';</script>
 <script>
-async function loadMyReports(){try{const res=await repairApi.my({page:1,size:20});
-document.getElementById('myReportBody').innerHTML=(res.data.records||[]).map(r=>`<tr><td><code>${r.reportNo}</code></td><td>${r.address||'-'}</td><td>${(r.description||'').substring(0,30)}</td><td>${statusTag('repairStatus',r.status)}</td><td>${r.reply||'-'}</td><td>${formatDateTime(r.createdAt)}</td></tr>`).join('')||'<tr><td colspan="6" class="text-center text-muted">暂无报修记录</td></tr>';}catch(err){showToast(err.message,'error');}}
+const isAdmin = hasRole('ADMIN');
+const isOperator = hasRole('OPERATOR');
+const canReview = isAdmin; // 只有管理员能审核
+let viewAll = isAdmin || isOperator; // 管理员/运维默认看所有
+if (canReview || isOperator) document.getElementById('viewToggleBtn').style.display = '';
+
+function toggleView(){
+    viewAll = !viewAll;
+    document.getElementById('cardTitle').textContent = viewAll ? '全部报修' : '我的报修';
+    document.getElementById('viewToggleBtn').textContent = viewAll ? '切换至我的报修' : '切换至全部报修';
+    loadReports();
+}
+
 function closeModal(id){document.getElementById(id).classList.remove('show');}
-function openReport(){document.getElementById('reportModal').classList.add('show');}
-async function submitReport(){try{await repairApi.create({address:document.getElementById('rAddress').value,description:document.getElementById('rDesc').value,reporterName:document.getElementById('rName').value,reporterPhone:document.getElementById('rPhone').value});showToast('报修提交成功','success');closeModal('reportModal');loadMyReports();}catch(err){showToast(err.message,'error');}}
-loadMyReports();
+
+async function loadReports(){
+    try{
+        const api = viewAll ? repairApi.list({page:1,size:50}) : repairApi.my({page:1,size:50});
+        const res = await api;
+        const rows = (res.data.records||[]).map(r=>{
+            let actions = `<button class="btn btn-outline btn-sm" onclick="showDetail(${r.id})">详情</button>`;
+            if (canReview && r.status === 0){
+                actions += ` <button class="btn btn-success btn-sm" onclick="openReview(${r.id},1)">通过</button>`;
+                actions += ` <button class="btn btn-danger btn-sm" onclick="openReview(${r.id},4)">拒绝</button>`;
+            }
+            return `<tr><td><code>${r.reportNo}</code></td><td>${r.address||'-'}</td><td>${(r.description||'').substring(0,30)}</td><td>${r.reporterName||'-'}</td><td>${r.reporterPhone||'-'}</td><td>${statusTag('repairStatus',r.status)}</td><td>${r.reply||'-'}</td><td>${formatDateTime(r.createdAt)}</td><td style="white-space:nowrap">${actions}</td></tr>`;
+        }).join('');
+        document.getElementById('reportBody').innerHTML = rows || '<tr><td colspan="9" class="text-center text-muted">暂无报修</td></tr>';
+    }catch(err){showToast(err.message,'error');}
+}
+
+function openReport(){
+    ['rAddress','rDesc','rName','rPhone'].forEach(id=>document.getElementById(id).value='');
+    const u = getUser(); if(u){document.getElementById('rName').value=u.realName||'';document.getElementById('rPhone').value=u.phone||'';}
+    document.getElementById('reportModal').classList.add('show');
+}
+async function submitReport(){
+    const address=document.getElementById('rAddress').value.trim();
+    const description=document.getElementById('rDesc').value.trim();
+    if(!address||!description){showToast('地址和描述必填','warning');return;}
+    try{
+        await repairApi.create({address,description,reporterName:document.getElementById('rName').value,reporterPhone:document.getElementById('rPhone').value});
+        showToast('报修提交成功,等待管理员审核','success');closeModal('reportModal');loadReports();
+    }catch(err){showToast(err.message,'error');}
+}
+
+function openReview(id,status){
+    document.getElementById('reviewId').value=id;
+    document.getElementById('reviewStatus').value=status;
+    document.getElementById('reviewReply').value='';
+    document.getElementById('reviewTitle').textContent = status===1 ? '审核通过' : '审核拒绝';
+    document.getElementById('reviewHint').textContent = status===1 ? '通过后系统将自动在"维修工单"页生成工单' : '拒绝后该报修关闭,不再生成工单';
+    document.getElementById('reviewModal').classList.add('show');
+}
+async function submitReview(){
+    const id=document.getElementById('reviewId').value;
+    const status=parseInt(document.getElementById('reviewStatus').value);
+    try{
+        await repairApi.handle(id,{status,reply:document.getElementById('reviewReply').value});
+        showToast(status===1?'已通过,工单已生成':'已拒绝','success');
+        closeModal('reviewModal');loadReports();
+    }catch(err){showToast(err.message,'error');}
+}
+
+async function showDetail(id){
+    try{
+        const res = await repairApi.detail(id); const r = res.data;
+        document.getElementById('detailBody').innerHTML = `
+            <table class="detail-table" style="width:100%;border-collapse:collapse">
+              <tr><td style="padding:8px;font-weight:600;color:#64748B;width:120px">报修号</td><td><code>${r.reportNo}</code></td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">地址</td><td>${r.address||'-'}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">描述</td><td>${r.description||'-'}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">联系人</td><td>${r.reporterName||'-'}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">联系电话</td><td>${r.reporterPhone||'-'}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">状态</td><td>${statusTag('repairStatus',r.status)}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">审核回复</td><td>${r.reply||'-'}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">提交时间</td><td>${formatDateTime(r.createdAt)}</td></tr>
+              <tr><td style="padding:8px;font-weight:600;color:#64748B">关联工单</td><td>${r.workOrderId?('#'+r.workOrderId):'-'}</td></tr>
+            </table>`;
+        document.getElementById('detailModal').classList.add('show');
+    }catch(err){showToast(err.message,'error');}
+}
+
+document.getElementById('cardTitle').textContent = viewAll ? '全部报修' : '我的报修';
+loadReports();
 </script>
 </body>
 </html>

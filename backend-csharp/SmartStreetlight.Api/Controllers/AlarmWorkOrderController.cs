@@ -58,6 +58,61 @@ public class AlarmController : ControllerBase
         await _db.SaveChangesAsync();
         return Ok(Result.Success());
     }
+
+    [HttpPost]
+    [Authorize(Roles = "ADMIN,OPERATOR")]
+    public async Task<IActionResult> Create([FromBody] AlarmCreateDTO dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Title))
+            return Ok(Result.Error(400, "标题不能为空"));
+        var now = DateTime.Now;
+        var alarm = new Alarm
+        {
+            AlarmCode = $"ALM-{now:yyyyMMdd}-{Random.Shared.Next(1000, 9999)}",
+            Type = dto.Type,
+            Level = dto.Level <= 0 ? 2 : dto.Level,
+            StreetlightId = dto.StreetlightId,
+            CabinetId = dto.CabinetId,
+            AreaId = dto.AreaId,
+            Title = dto.Title,
+            Description = dto.Description,
+            Status = 0,
+            AlarmTime = now
+        };
+        _db.Alarms.Add(alarm);
+        await _db.SaveChangesAsync();
+        return Ok(Result<object>.Success(new { id = alarm.Id, alarmCode = alarm.AlarmCode }));
+    }
+
+    [HttpPut("batch-handle")]
+    [Authorize(Roles = "ADMIN,OPERATOR")]
+    public async Task<IActionResult> BatchHandle([FromBody] AlarmBatchHandleDTO dto)
+    {
+        if (dto.Ids == null || dto.Ids.Length == 0)
+            return Ok(Result.Error(400, "请选择至少一条告警"));
+        var username = User.Identity?.Name;
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == username);
+        var now = DateTime.Now;
+        var list = await _db.Alarms.Where(a => dto.Ids.Contains(a.Id)).ToListAsync();
+        foreach (var a in list)
+        {
+            a.Status = dto.Status;
+            a.HandleRemark = dto.HandleRemark;
+            a.HandleTime = now;
+            if (user != null) a.HandlerId = user.Id;
+        }
+        await _db.SaveChangesAsync();
+        return Ok(Result<object>.Success(new { affected = list.Count }));
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> Delete(long id)
+    {
+        var entity = await _db.Alarms.FindAsync(id);
+        if (entity != null) { _db.Alarms.Remove(entity); await _db.SaveChangesAsync(); }
+        return Ok(Result.Success());
+    }
 }
 
 [ApiController]
@@ -136,17 +191,25 @@ public class WorkOrderController : ControllerBase
 
     [HttpPut("{id}/status")]
     [Authorize(Roles = "ADMIN,OPERATOR")]
-    public async Task<IActionResult> UpdateStatus(long id, [FromBody] Dictionary<string, object> body)
+    public async Task<IActionResult> UpdateStatus(long id, [FromBody] WorkOrderStatusDTO dto)
     {
         var entity = await _db.WorkOrders.FindAsync(id);
         if (entity == null) return Ok(Result.Error(404, "工单不存在"));
 
-        if (body.TryGetValue("status", out var statusObj))
-            entity.Status = Convert.ToInt32(statusObj);
-
+        entity.Status = dto.Status;
         if (entity.Status == 3) // Completed
             entity.ActualFinish = DateTime.Now;
 
+        await _db.SaveChangesAsync();
+        return Ok(Result.Success());
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "ADMIN")]
+    public async Task<IActionResult> Delete(long id)
+    {
+        var entity = await _db.WorkOrders.FindAsync(id);
+        if (entity != null) _db.WorkOrders.Remove(entity);
         await _db.SaveChangesAsync();
         return Ok(Result.Success());
     }

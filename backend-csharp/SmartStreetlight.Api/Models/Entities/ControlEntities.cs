@@ -86,6 +86,15 @@ public class ControlStrategy
     [Column("effective_end")]
     public DateOnly? EffectiveEnd { get; set; }
 
+    [Column("start_datetime")]
+    public DateTime? StartDatetime { get; set; }
+
+    [Column("end_datetime")]
+    public DateTime? EndDatetime { get; set; }
+
+    [Column("last_phase")]
+    public int LastPhase { get; set; } = 0;
+
     public int Status { get; set; } = 1;
 
     public int Priority { get; set; } = 0;

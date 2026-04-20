@@ -5,6 +5,8 @@ services:
     image: mysql:8.0
     container_name: smartlight-csharp-mysql
     restart: unless-stopped
+    ports:
+      - "3307:3306"
     environment:
       MYSQL_ROOT_PASSWORD: root123
       MYSQL_DATABASE: smart_streetlight
@@ -30,6 +32,19 @@ services:
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
 
+  db-init:
+    image: mysql:8.0
+    container_name: smartlight-csharp-db-init
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./database/sql/init.sql:/sql/init.sql:ro
+      - ./database/sql/data.sql:/sql/data.sql:ro
+      - ./database/ensure-data.sh:/ensure-data.sh:ro
+    entrypoint: ["bash", "/ensure-data.sh"]
+    restart: "no"
+
   backend:
     container_name: smartlight-csharp-backend
     build:
@@ -39,6 +54,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
       mqtt:
         condition: service_started
     environment:
@@ -57,7 +74,7 @@ services:
       dockerfile: Dockerfile.frontend
     restart: unless-stopped
     ports:
-      - "3001:80"
+      - "3010:80"
     depends_on:
       - backend
 

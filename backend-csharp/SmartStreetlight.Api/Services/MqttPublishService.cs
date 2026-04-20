@@ -55,15 +55,10 @@ public class MqttPublishService
                     filter.WithTopic("streetlight/+/status");
                     filter.WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce);
                 })
-                .WithTopicFilter(filter =>
-                {
-                    filter.WithTopic("streetlight/+/alarm");
-                    filter.WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce);
-                })
                 .Build());
 
             _logger.LogInformation("[MQTT] Connected to {Broker}", _brokerInfo);
-            _logger.LogInformation("[MQTT] Subscribed topics: streetlight/+/status, streetlight/+/alarm");
+            _logger.LogInformation("[MQTT] Subscribed topics: streetlight/+/status (alarm auto-creation disabled, manual only)");
         }
         catch (Exception ex)
         {
@@ -150,14 +145,7 @@ public class MqttPublishService
                     record.DeviceUid = parsedUid;
                 }
             }
-            else if (topic.EndsWith("/alarm", StringComparison.OrdinalIgnoreCase))
-            {
-                var parsedUid = await SaveAlarmAsync(db, payload, deviceUid);
-                if (!string.IsNullOrWhiteSpace(parsedUid))
-                {
-                    record.DeviceUid = parsedUid;
-                }
-            }
+            // alarm topic ignored: alarms are created manually only
         }
         catch (Exception ex)
         {
@@ -227,14 +215,10 @@ public class MqttPublishService
         {
             light.LightStatus = lightStatus.GetInt32();
         }
+        // 只在 payload 显式带 onlineStatus 时才更新;避免设备高频上报覆盖策略/运维刚设置的状态。
         if (root.TryGetProperty("onlineStatus", out var onlineStatus) && onlineStatus.ValueKind == JsonValueKind.Number)
         {
             light.OnlineStatus = onlineStatus.GetInt32();
-        }
-        else
-        {
-            // Status uplink from device implies device is online.
-            light.OnlineStatus = 1;
         }
         if (root.TryGetProperty("deviceStatus", out var deviceStatus) && deviceStatus.ValueKind == JsonValueKind.Number)
         {

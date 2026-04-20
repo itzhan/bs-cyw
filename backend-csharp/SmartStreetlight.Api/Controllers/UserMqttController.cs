@@ -36,6 +36,35 @@ public class UserController : ControllerBase
         return user == null ? Ok(Result.Error(404, "用户不存在")) : Ok(Result<object>.Success(user));
     }
 
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] UserCreateDTO dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Username))
+            return Ok(Result.Error(400, "用户名不能为空"));
+        if (await _db.Users.AnyAsync(u => u.Username == dto.Username))
+            return Ok(Result.Error(400, "用户名已存在"));
+
+        var user = new User
+        {
+            Username = dto.Username,
+            Password = BCrypt.Net.BCrypt.HashPassword(string.IsNullOrEmpty(dto.Password) ? "123456" : dto.Password),
+            RealName = dto.RealName,
+            Phone = dto.Phone,
+            Email = dto.Email,
+            Status = dto.Status
+        };
+        _db.Users.Add(user);
+        await _db.SaveChangesAsync();
+
+        if (dto.RoleIds != null)
+        {
+            foreach (var roleId in dto.RoleIds)
+                _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = roleId });
+            await _db.SaveChangesAsync();
+        }
+        return Ok(Result.Success());
+    }
+
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(long id, [FromBody] UserUpdateDTO dto)
     {

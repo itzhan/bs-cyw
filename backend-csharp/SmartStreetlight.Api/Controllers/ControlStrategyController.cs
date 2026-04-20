@@ -142,6 +142,9 @@ public class ControlStrategyController : ControllerBase
         if (dto.TargetLatitude.HasValue) entity.TargetLatitude = dto.TargetLatitude;
         if (dto.EffectiveStart.HasValue) entity.EffectiveStart = dto.EffectiveStart;
         if (dto.EffectiveEnd.HasValue) entity.EffectiveEnd = dto.EffectiveEnd;
+        entity.StartDatetime = dto.StartDatetime;
+        entity.EndDatetime = dto.EndDatetime;
+        entity.LastPhase = 0; // 编辑后重置调度状态,允许重新触发
         entity.Status = dto.Status;
         if (dto.Priority != 0) entity.Priority = dto.Priority;
         if (dto.AreaId.HasValue) entity.AreaId = dto.AreaId;

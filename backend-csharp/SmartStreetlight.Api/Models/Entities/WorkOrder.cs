@@ -17,6 +17,9 @@ public class WorkOrder
     [Column("alarm_id")]
     public long? AlarmId { get; set; }
 
+    [Column("repair_report_id")]
+    public long? RepairReportId { get; set; }
+
     [Column("streetlight_id")]
     public long? StreetlightId { get; set; }
 

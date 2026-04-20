@@ -16,14 +16,21 @@
             <h2 class="page-title">告警中心</h2>
             
 <div class="card">
-    <div class="card-header"><h3>告警信息</h3></div>
+    <div class="card-header">
+        <h3>告警信息</h3>
+        <div>
+            <button class="btn btn-primary btn-sm" onclick="openCreate()" id="createBtn">+ 新建告警</button>
+            <button class="btn btn-warning btn-sm" onclick="openBatch()" id="batchBtn">批量处理</button>
+        </div>
+    </div>
     <div class="card-body">
         <div class="search-bar">
             <select class="form-select" id="filterType" style="width:120px" onchange="loadAlarms()">
                 <option value="">全部类型</option>
                 <option value="1">灯具故障</option><option value="2">电压异常</option>
                 <option value="3">电流异常</option><option value="4">通信故障</option>
-                <option value="5">线缆异常</option><option value="6">其他</option>
+                <option value="5">线缆异常</option><option value="6">温度异常</option>
+                <option value="7">漏电告警</option><option value="8">其他</option>
             </select>
             <select class="form-select" id="filterLevel" style="width:110px" onchange="loadAlarms()">
                 <option value="">全部级别</option>
@@ -39,13 +46,42 @@
         </div>
         <div class="table-container">
             <table class="data-table">
-                <thead><tr><th>告警编码</th><th>标题</th><th>类型</th><th>级别</th><th>状态</th><th>告警时间</th><th>操作</th></tr></thead>
-                <tbody id="alarmTableBody"><tr><td colspan="7"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+                <thead><tr><th style="width:40px"><input type="checkbox" id="selectAll" onclick="toggleAll(this)"></th><th>告警编码</th><th>标题</th><th>类型</th><th>级别</th><th>状态</th><th>告警时间</th><th>操作</th></tr></thead>
+                <tbody id="alarmTableBody"><tr><td colspan="8"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
             </table>
         </div>
         <div id="pagination"></div>
     </div>
 </div>
+
+<!-- 新建告警 -->
+<div class="modal-overlay" id="createModal"><div class="modal" style="max-width:560px">
+    <div class="modal-header"><h3>新建告警</h3><button class="modal-close" onclick="closeModal('createModal')">✕</button></div>
+    <div class="modal-body">
+        <div class="form-group"><label class="form-label">标题 *</label><input class="form-input" id="nTitle"></div>
+        <div class="grid-2">
+            <div class="form-group"><label class="form-label">类型</label><select class="form-select" id="nType"><option value="1">灯具故障</option><option value="2">电压异常</option><option value="3">电流异常</option><option value="4">通信故障</option><option value="5">线缆异常</option><option value="6">温度异常</option><option value="7">漏电告警</option><option value="8" selected>其他</option></select></div>
+            <div class="form-group"><label class="form-label">级别</label><select class="form-select" id="nLevel"><option value="1">低</option><option value="2" selected>中</option><option value="3">高</option><option value="4">紧急</option></select></div>
+        </div>
+        <div class="form-group"><label class="form-label">关联路灯ID(可选)</label><input class="form-input" id="nLightId" type="number" placeholder="填写路灯id"></div>
+        <div class="form-group"><label class="form-label">关联区域ID(可选)</label><input class="form-input" id="nAreaId" type="number"></div>
+        <div class="form-group"><label class="form-label">描述</label><textarea class="form-textarea" id="nDesc"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('createModal')">取消</button><button class="btn btn-primary" onclick="submitCreate()">保存</button></div>
+</div></div>
+
+<!-- 批量处理 -->
+<div class="modal-overlay" id="batchModal"><div class="modal" style="max-width:480px">
+    <div class="modal-header"><h3>批量处理</h3><button class="modal-close" onclick="closeModal('batchModal')">✕</button></div>
+    <div class="modal-body">
+        <p id="batchCount" class="text-muted"></p>
+        <div class="form-group"><label class="form-label">目标状态</label>
+            <select class="form-select" id="bStatus"><option value="1">处理中</option><option value="2">已处理</option><option value="3">已忽略</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="bRemark"></textarea></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('batchModal')">取消</button><button class="btn btn-primary" onclick="submitBatch()">确认处理</button></div>
+</div></div>
 <div class="modal-overlay" id="handleModal">
     <div class="modal">
         <div class="modal-header"><h3>处理告警</h3><button class="modal-close" onclick="closeModal('handleModal')">✕</button></div>
@@ -68,21 +104,25 @@
 <script>if(!initPage('alarm','告警中心'))throw'';</script>
 <script>
 let currentPage=1;
+function getSelected(){return [...document.querySelectorAll('.row-check:checked')].map(c=>parseInt(c.value));}
+function toggleAll(cb){document.querySelectorAll('.row-check').forEach(c=>c.checked=cb.checked);}
 async function loadAlarms(page){
     currentPage=page||1;
     try{
         const res=await alarmApi.list({page:currentPage,size:10,type:document.getElementById('filterType').value,level:document.getElementById('filterLevel').value,status:document.getElementById('filterStatus').value});
         const d=res.data;
+        document.getElementById('selectAll').checked=false;
         document.getElementById('alarmTableBody').innerHTML=d.records.map(a=>`
             <tr>
+                <td><input type="checkbox" class="row-check" value="${a.id}"></td>
                 <td><code>${a.alarmCode}</code></td><td>${a.title}</td>
-                <td>${STATUS_MAP.alarmType[a.type]||a.type}</td>
+                <td>${(STATUS_MAP.alarmType&&STATUS_MAP.alarmType[a.type])||a.type}</td>
                 <td>${statusTag('alarmLevel',a.level)}</td>
                 <td>${statusTag('alarmStatus',a.status)}</td>
                 <td>${formatDateTime(a.alarmTime)}</td>
                 <td>${a.status<2?`<button class="btn btn-warning btn-sm" onclick="openHandle(${a.id})">处理</button>`:'-'}</td>
             </tr>
-        `).join('')||'<tr><td colspan="7" class="text-center text-muted">暂无告警</td></tr>';
+        `).join('')||'<tr><td colspan="8" class="text-center text-muted">暂无告警</td></tr>';
         renderPagination('pagination',d.total,d.page,d.size,loadAlarms);
     }catch(err){showToast(err.message,'error');}
 }
@@ -92,6 +132,39 @@ async function submitHandle(){
     try{
         await alarmApi.handle(document.getElementById('handleId').value,{status:parseInt(document.getElementById('handleStatus').value),handleRemark:document.getElementById('handleRemark').value});
         showToast('处理成功','success');closeModal('handleModal');loadAlarms(currentPage);
+    }catch(err){showToast(err.message,'error');}
+}
+function openCreate(){
+    ['nTitle','nDesc','nLightId','nAreaId'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('nType').value='8';document.getElementById('nLevel').value='2';
+    document.getElementById('createModal').classList.add('show');
+}
+async function submitCreate(){
+    const title=document.getElementById('nTitle').value.trim();
+    if(!title){showToast('标题不能为空','warning');return;}
+    const data={
+        title,
+        type:parseInt(document.getElementById('nType').value),
+        level:parseInt(document.getElementById('nLevel').value),
+        streetlightId:document.getElementById('nLightId').value?parseInt(document.getElementById('nLightId').value):null,
+        areaId:document.getElementById('nAreaId').value?parseInt(document.getElementById('nAreaId').value):null,
+        description:document.getElementById('nDesc').value||null
+    };
+    try{await alarmApi.create(data);showToast('告警已新建','success');closeModal('createModal');loadAlarms(currentPage);}
+    catch(err){showToast(err.message,'error');}
+}
+function openBatch(){
+    const ids=getSelected();
+    if(ids.length===0){showToast('请勾选要处理的告警','warning');return;}
+    document.getElementById('batchCount').textContent=`已选择 ${ids.length} 条告警`;
+    document.getElementById('batchModal').classList.add('show');
+}
+async function submitBatch(){
+    const ids=getSelected();
+    if(ids.length===0)return;
+    try{
+        await alarmApi.batchHandle({ids,status:parseInt(document.getElementById('bStatus').value),handleRemark:document.getElementById('bRemark').value});
+        showToast('批量处理完成','success');closeModal('batchModal');loadAlarms(currentPage);
     }catch(err){showToast(err.message,'error');}
 }
 loadAlarms();

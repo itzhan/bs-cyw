@@ -167,9 +167,9 @@ function renderSidebar(activePage) {
         { icon: 'file-text', text: '报修管理', href: '/pages/repair.html', id: 'repair' },
         { section: '数据分析' },
         { icon: 'bar-chart-3', text: '数据统计', href: '/pages/statistics.html', id: 'statistics' },
+        { icon: 'megaphone', text: '系统公告', href: '/pages/announcement.html', id: 'announcement' },
         { section: '系统管理', roles: ['ADMIN'] },
         { icon: 'users', text: '用户管理', href: '/pages/users.html', id: 'users', roles: ['ADMIN'] },
-        { icon: 'megaphone', text: '公告管理', href: '/pages/announcement.html', id: 'announcement', roles: ['ADMIN'] },
         { section: 'IoT通信', roles: ['ADMIN', 'OPERATOR'] },
         { icon: 'radio', text: 'MQTT通信', href: '/pages/mqtt.html', id: 'mqtt', roles: ['ADMIN', 'OPERATOR'] },
     ];

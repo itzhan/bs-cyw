@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>公告管理 - 城市智慧路灯管理系统</title>
+    <title>系统公告 - 城市智慧路灯管理系统</title>
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <main class="main-content">
         <header class="top-header" id="topHeader"></header>
         <div class="page-content">
-            <h2 class="page-title">公告管理</h2>
+            <h2 class="page-title" id="pageTitle">系统公告</h2>
 
 <div class="card">
     <div class="card-header">
@@ -20,7 +20,7 @@
         <button class="btn btn-primary btn-sm" onclick="openCreate()" id="createBtn" style="display:none">+ 新增公告</button>
     </div>
     <div class="card-body">
-        <div class="search-bar">
+        <div class="search-bar" id="filterBar" style="display:none">
             <select class="form-select" id="filterStatus" style="width:140px" onchange="loadList()">
                 <option value="">全部状态</option><option value="0">草稿</option><option value="1">已发布</option><option value="2">已撤回</option>
             </select>
@@ -66,11 +66,16 @@
 <script src="../js/vendor/lucide.min.js"></script>
 <script src="../js/api.js"></script>
 <script src="../js/utils.js"></script>
-<script>if(!initPage('announcement','公告管理'))throw'';</script>
+<script>if(!initPage('announcement','系统公告'))throw'';</script>
 <script>
 let currentPage=1, editId=null, deleteId=null;
 const isAdmin = hasRole('ADMIN');
-if (isAdmin) document.getElementById('createBtn').style.display = '';
+if (isAdmin) {
+    document.getElementById('createBtn').style.display = '';
+    document.getElementById('filterBar').style.display = '';
+    document.getElementById('pageTitle').textContent = '公告管理';
+    document.title = '公告管理 - 城市智慧路灯管理系统';
+}
 
 async function loadList(page){
     currentPage = page || 1;

@@ -52,6 +52,15 @@
     </div>
 </div>
 
+<!-- 详情弹窗(所有角色可用) -->
+<div class="modal-overlay" id="detailModal">
+    <div class="modal" style="max-width:680px">
+        <div class="modal-header"><h3>公告详情</h3><button class="modal-close" onclick="closeModal('detailModal')">✕</button></div>
+        <div class="modal-body" id="detailBody"><div class="loading"><div class="spinner"></div></div></div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('detailModal')">关闭</button></div>
+    </div>
+</div>
+
 <!-- 删除确认 -->
 <div class="modal-overlay" id="deleteModal">
     <div class="modal" style="max-width:380px">
@@ -86,14 +95,14 @@ async function loadList(page){
         const res = await apiCall;
         const d = res.data;
         document.getElementById('tbody').innerHTML = (d.records||[]).map(a => {
-            let actions = '';
+            let actions = `<button class="btn btn-outline btn-sm" onclick="showDetail(${a.id})">查看</button>`;
             if (isAdmin) {
-                actions = `<button class="btn btn-outline btn-sm" onclick="openEdit(${a.id})">编辑</button>
+                actions += ` <button class="btn btn-outline btn-sm" onclick="openEdit(${a.id})">编辑</button>
                     <button class="btn btn-sm ${a.topFlag===1?'btn-warning':'btn-outline'}" onclick="toggleTopItem(${a.id})">${a.topFlag===1?'取消置顶':'置顶'}</button>
                     ${a.status!==1?`<button class="btn btn-success btn-sm" onclick="publishItem(${a.id})">发布</button>`:''}
                     ${a.status===1?`<button class="btn btn-warning btn-sm" onclick="withdrawItem(${a.id})">撤回</button>`:''}
                     <button class="btn btn-danger btn-sm" onclick="openDelete(${a.id})">删除</button>`;
-            } else { actions = '-'; }
+            }
             return `<tr>
                 <td>${a.id}</td>
                 <td>${a.title}</td>
@@ -106,6 +115,34 @@ async function loadList(page){
         }).join('') || '<tr><td colspan="7" class="text-center text-muted">暂无公告</td></tr>';
         renderPagination('pagination', d.total, d.page, d.size, loadList);
     } catch(err){ showToast(err.message,'error'); }
+}
+
+async function showDetail(id){
+    document.getElementById('detailBody').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+    document.getElementById('detailModal').classList.add('show');
+    try{
+        // 非 admin 用 /published 列表里已拿到的数据(无鉴权限制),admin 用 /{id} 拿全量
+        let a;
+        if (isAdmin) {
+            const res = await announceApi.detail(id);
+            a = res.data;
+        } else {
+            const res = await announceApi.published();
+            a = (res.data||[]).find(x => x.id === id);
+        }
+        if (!a) { document.getElementById('detailBody').innerHTML = '<p class="text-muted" style="text-align:center">公告不存在或已撤回</p>'; return; }
+        document.getElementById('detailBody').innerHTML = `
+            <div style="margin-bottom:16px">
+                ${a.topFlag===1 ? '<span class="tag tag-danger" style="margin-right:8px">📌 置顶</span>' : ''}
+                <span class="tag tag-info">${(STATUS_MAP.announcementType&&STATUS_MAP.announcementType[a.type])||'公告'}</span>
+            </div>
+            <h2 style="font-size:20px;margin-bottom:8px">${a.title}</h2>
+            <div style="color:#64748B;font-size:13px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #F1F5F9">
+                发布时间: ${formatDateTime(a.publishTime)}
+            </div>
+            <div style="white-space:pre-wrap;line-height:1.8;color:#1E293B">${(a.content||'').replace(/</g,'&lt;')}</div>
+        `;
+    }catch(err){ document.getElementById('detailBody').innerHTML = `<p style="color:#EF4444;text-align:center">加载失败: ${err.message}</p>`; }
 }
 
 async function toggleTopItem(id){

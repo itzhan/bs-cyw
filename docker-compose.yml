@@ -41,8 +41,10 @@ services:
     volumes:
       - ./database/sql/init.sql:/sql/init.sql:ro
       - ./database/sql/data.sql:/sql/data.sql:ro
+      - ./database/sql/migration_v2.sql:/sql/migration_v2.sql:ro
       - ./database/ensure-data.sh:/ensure-data.sh:ro
-    entrypoint: ["bash", "/ensure-data.sh"]
+    # 把脚本里可能被 Windows 改成 CRLF 的 \r 剥掉再执行,防止 Windows 用户 git clone 时脚本跑不起来
+    entrypoint: ["bash", "-c", "sed 's/\\r$//' /ensure-data.sh | bash"]
     restart: "no"
 
   backend:

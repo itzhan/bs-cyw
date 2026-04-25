@@ -5,6 +5,7 @@ using SmartStreetlight.Api.Common;
 using SmartStreetlight.Api.Data;
 using SmartStreetlight.Api.Models.DTOs;
 using SmartStreetlight.Api.Models.Entities;
+using SmartStreetlight.Api.Services;
 
 namespace SmartStreetlight.Api.Controllers;
 
@@ -13,7 +14,14 @@ namespace SmartStreetlight.Api.Controllers;
 public class ControlController : ControllerBase
 {
     private readonly AppDbContext _db;
-    public ControlController(AppDbContext db) => _db = db;
+    private readonly MqttPublishService _mqtt;
+    private readonly ILogger<ControlController> _logger;
+    public ControlController(AppDbContext db, MqttPublishService mqtt, ILogger<ControlController> logger)
+    {
+        _db = db;
+        _mqtt = mqtt;
+        _logger = logger;
+    }
 
     [HttpPost("execute")]
     [Authorize(Roles = "ADMIN,OPERATOR")]
@@ -32,25 +40,34 @@ public class ControlController : ControllerBase
             return Ok(Result.Error(400, "请指定路灯或区域"));
 
         int successCount = 0;
+        var mqttTasks = new List<Task>();
         foreach (var light in lights)
         {
             if (light.OnlineStatus == 0) continue;
             bool success = true;
+            int? targetBrightness = null;
+            string mqttPayload = "";
             switch (dto.Action)
             {
                 case "TURN_ON":
                     light.LightStatus = 1;
                     light.Brightness = dto.Brightness ?? 100;
+                    targetBrightness = light.Brightness;
+                    mqttPayload = $"{{\"action\":\"TURN_ON\",\"brightness\":{light.Brightness}}}";
                     break;
                 case "TURN_OFF":
                     light.LightStatus = 0;
                     light.Brightness = 0;
+                    targetBrightness = 0;
+                    mqttPayload = "{\"action\":\"TURN_OFF\"}";
                     break;
                 case "SET_BRIGHTNESS":
                     if (dto.Brightness.HasValue)
                     {
                         light.Brightness = dto.Brightness.Value;
                         light.LightStatus = dto.Brightness > 0 ? 1 : 0;
+                        targetBrightness = dto.Brightness.Value;
+                        mqttPayload = $"{{\"action\":\"SET_BRIGHTNESS\",\"brightness\":{dto.Brightness.Value}}}";
                     }
                     break;
                 default:
@@ -58,6 +75,14 @@ public class ControlController : ControllerBase
                     break;
             }
             if (success) successCount++;
+
+            // 关键修复: 同时下发 MQTT 给真实设备模拟器,
+            // 否则模拟器仍持有旧状态, 5s 后上报 status 会把 DB 又覆盖回去。
+            if (success && !string.IsNullOrWhiteSpace(light.DeviceUid) && !string.IsNullOrEmpty(mqttPayload))
+            {
+                try { mqttTasks.Add(_mqtt.SendCommandAsync(light.DeviceUid!, dto.Action, mqttPayload)); }
+                catch { /* ignore mqtt errors, DB 已经写了 */ }
+            }
 
             _db.ControlLogs.Add(new ControlLog
             {
@@ -71,6 +96,11 @@ public class ControlController : ControllerBase
             });
         }
         await _db.SaveChangesAsync();
+        if (mqttTasks.Count > 0)
+        {
+            try { await Task.WhenAll(mqttTasks); }
+            catch (Exception ex) { _logger.LogWarning("[Control] MQTT sync failed: {Msg}", ex.Message); }
+        }
         return Ok(Result.Success($"成功控制 {successCount} 盏路灯", null));
     }
 

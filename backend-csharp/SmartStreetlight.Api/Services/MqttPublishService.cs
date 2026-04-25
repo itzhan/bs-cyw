@@ -4,6 +4,7 @@ using MQTTnet.Protocol;
 using Microsoft.EntityFrameworkCore;
 using SmartStreetlight.Api.Data;
 using SmartStreetlight.Api.Models.Entities;
+using System.Collections.Concurrent;
 using System.Text;
 using System.Text.Json;
 
@@ -14,6 +15,7 @@ public class MqttPublishService
     private IMqttClient? _client;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MqttPublishService> _logger;
+    private readonly ConcurrentDictionary<string, long> _streetlightIdCache = new();
     private string _brokerInfo = "未配置";
 
     public MqttPublishService(IServiceScopeFactory scopeFactory, ILogger<MqttPublishService> logger)
@@ -189,7 +191,7 @@ public class MqttPublishService
             return null;
         }
 
-        var light = await db.Streetlights.FirstOrDefaultAsync(s => s.DeviceUid == deviceUid);
+        var light = await FindStreetlightByDeviceUidAsync(db, deviceUid);
         if (light == null)
         {
             return deviceUid;
@@ -246,6 +248,28 @@ public class MqttPublishService
         }
 
         return deviceUid;
+    }
+
+    private async Task<Streetlight?> FindStreetlightByDeviceUidAsync(AppDbContext db, string deviceUid)
+    {
+        if (_streetlightIdCache.TryGetValue(deviceUid, out var streetlightId))
+        {
+            var cached = await db.Streetlights.FindAsync(streetlightId);
+            if (cached != null)
+            {
+                return cached;
+            }
+
+            _streetlightIdCache.TryRemove(deviceUid, out _);
+        }
+
+        var light = await db.Streetlights.FirstOrDefaultAsync(s => s.DeviceUid == deviceUid);
+        if (light != null)
+        {
+            _streetlightIdCache[deviceUid] = light.Id;
+        }
+
+        return light;
     }
 
     private async Task<string?> SaveAlarmAsync(AppDbContext db, string payload, string? fallbackDeviceUid)

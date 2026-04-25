@@ -35,3 +35,9 @@ if [ -f /sql/migration_v2.sql ]; then
     echo "[ensure-data] Applying migration_v2.sql (idempotent)..."
     mysql -h"$HOST" -u"$USER" -p"$PASS" "$DB" < /sql/migration_v2.sql 2>/dev/null || echo "[ensure-data] migration_v2 skipped (maybe already applied)"
 fi
+
+# v3 迁移: 新增 system_setting 表(幂等)
+if [ -f /sql/migration_v3.sql ]; then
+    echo "[ensure-data] Applying migration_v3.sql (idempotent)..."
+    mysql -h"$HOST" -u"$USER" -p"$PASS" "$DB" < /sql/migration_v3.sql 2>/dev/null || echo "[ensure-data] migration_v3 skipped (maybe already applied)"
+fi

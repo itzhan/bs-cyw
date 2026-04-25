@@ -111,3 +111,53 @@ public class RepairReportDTO
     public string? Description { get; set; }
     public string? Images { get; set; }
 }
+
+public class StreetlightListDTO
+{
+    public long Id { get; set; }
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string? DeviceUid { get; set; }
+    public long AreaId { get; set; }
+    public string? AreaName { get; set; }
+    public long? CabinetId { get; set; }
+    public string? CabinetName { get; set; }
+    public string? LampType { get; set; }
+    public int? Power { get; set; }
+    public int OnlineStatus { get; set; }
+    public int LightStatus { get; set; }
+    public int DeviceStatus { get; set; }
+    public int Brightness { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}
+
+public class StreetlightDetailDTO
+{
+    public long Id { get; set; }
+    public string Code { get; set; } = "";
+    public string? DeviceUid { get; set; }
+    public string Name { get; set; } = "";
+    public long AreaId { get; set; }
+    public string? AreaName { get; set; }
+    public long? CabinetId { get; set; }
+    public string? CabinetName { get; set; }
+    public string? Address { get; set; }
+    public decimal? Longitude { get; set; }
+    public decimal? Latitude { get; set; }
+    public string? LampType { get; set; }
+    public string? HardwareModel { get; set; }
+    public string? ElectricalParams { get; set; }
+    public string? ProtectionRating { get; set; }
+    public int? Power { get; set; }
+    public decimal? Height { get; set; }
+    public int Brightness { get; set; }
+    public int OnlineStatus { get; set; }
+    public int LightStatus { get; set; }
+    public int DeviceStatus { get; set; }
+    public DateOnly? InstallDate { get; set; }
+    public decimal? Voltage { get; set; }
+    public decimal? CurrentVal { get; set; }
+    public decimal? Temperature { get; set; }
+    public int RunningHours { get; set; }
+    public DateTime UpdatedAt { get; set; }
+}

@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS streetlight;
 DROP TABLE IF EXISTS control_strategy;
 DROP TABLE IF EXISTS cabinet;
 DROP TABLE IF EXISTS announcement;
+DROP TABLE IF EXISTS system_setting;
 DROP TABLE IF EXISTS user_role;
 DROP TABLE IF EXISTS `user`;
 DROP TABLE IF EXISTS role;
@@ -261,6 +262,8 @@ CREATE TABLE energy_record (
     INDEX idx_streetlight_id (streetlight_id),
     INDEX idx_area_id (area_id),
     INDEX idx_record_date (record_date),
+    UNIQUE INDEX uk_streetlight_date (streetlight_id, record_date),
+    INDEX idx_record_date_area_id (record_date, area_id),
     FOREIGN KEY (streetlight_id) REFERENCES streetlight(id) ON DELETE SET NULL,
     FOREIGN KEY (cabinet_id) REFERENCES cabinet(id) ON DELETE SET NULL,
     FOREIGN KEY (area_id) REFERENCES area(id) ON DELETE SET NULL
@@ -309,6 +312,7 @@ CREATE TABLE repair_report (
     INDEX idx_report_no (report_no),
     INDEX idx_status (status),
     INDEX idx_reporter_id (reporter_id),
+    INDEX idx_status_reporter_created_at (status, reporter_id, created_at),
     FOREIGN KEY (streetlight_id) REFERENCES streetlight(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报修申请表';
 
@@ -328,7 +332,8 @@ CREATE TABLE announcement (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_status (status),
     INDEX idx_type (type),
-    INDEX idx_publish_time (publish_time)
+    INDEX idx_publish_time (publish_time),
+    INDEX idx_status_top_publish_time (status, top_flag, publish_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统公告表';
 
 -- ============================================
@@ -345,5 +350,22 @@ CREATE TABLE mqtt_message (
     INDEX idx_device_uid (device_uid),
     INDEX idx_topic (topic),
     INDEX idx_direction (direction),
-    INDEX idx_created_at (created_at)
+    INDEX idx_created_at (created_at),
+    INDEX idx_device_direction_created_at (device_uid, direction, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MQTT通信消息表';
+
+-- ============================================
+-- 15. 系统设置表
+-- ============================================
+CREATE TABLE system_setting (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    `key` VARCHAR(100) NOT NULL UNIQUE COMMENT '配置键',
+    `value` VARCHAR(500) NOT NULL COMMENT '配置值',
+    description VARCHAR(500) COMMENT '配置描述',
+    category VARCHAR(50) NOT NULL DEFAULT 'general' COMMENT '分类: energy/general/...',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统设置表';
+
+INSERT INTO system_setting (`key`, `value`, description, category) VALUES
+('energy.kwh_per_minute', '0.6', '每分钟每盏亮灯消耗电量(kWh)，用于能耗累计', 'energy');

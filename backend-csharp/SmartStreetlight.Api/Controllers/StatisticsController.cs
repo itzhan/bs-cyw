@@ -15,22 +15,66 @@ public class StatisticsController : ControllerBase
     [HttpGet("overview")]
     public async Task<IActionResult> Overview()
     {
-        var total = await _db.Streetlights.CountAsync();
-        var online = await _db.Streetlights.CountAsync(s => s.OnlineStatus == 1);
-        var lightOn = await _db.Streetlights.CountAsync(s => s.LightStatus == 1);
-        var fault = await _db.Streetlights.CountAsync(s => s.DeviceStatus == 0);
-        var totalCabinets = await _db.Cabinets.CountAsync();
-        var unhandledAlarms = await _db.Alarms.CountAsync(a => a.Status == 0);
-        var todayAlarms = await _db.Alarms.CountAsync(a => a.AlarmTime >= DateTime.Today);
-        var pendingOrders = await _db.WorkOrders.CountAsync(w => w.Status == 0 || w.Status == 1);
-        var pendingReports = await _db.RepairReports.CountAsync(r => r.Status == 0);
-
         var today = DateOnly.FromDateTime(DateTime.Today);
         var monthStart = new DateOnly(today.Year, today.Month, 1);
-        var todayEnergy = await _db.EnergyRecords
-            .Where(e => e.RecordDate == today).SumAsync(e => (decimal?)e.EnergyKwh) ?? 0;
-        var monthEnergy = await _db.EnergyRecords
-            .Where(e => e.RecordDate >= monthStart && e.RecordDate <= today).SumAsync(e => (decimal?)e.EnergyKwh) ?? 0;
+        var streetlightStats = await _db.Streetlights
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Online = g.Count(s => s.OnlineStatus == 1),
+                LightOn = g.Count(s => s.LightStatus == 1),
+                Fault = g.Count(s => s.DeviceStatus == 0)
+            })
+            .FirstOrDefaultAsync();
+        var totalCabinets = await _db.Cabinets.AsNoTracking().CountAsync();
+        var alarmStats = await _db.Alarms
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Unhandled = g.Count(a => a.Status == 0),
+                Today = g.Count(a => a.AlarmTime >= DateTime.Today)
+            })
+            .FirstOrDefaultAsync();
+        var workOrderStats = await _db.WorkOrders
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Pending = g.Count(w => w.Status == 0 || w.Status == 1)
+            })
+            .FirstOrDefaultAsync();
+        var repairStats = await _db.RepairReports
+            .AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Pending = g.Count(r => r.Status == 0)
+            })
+            .FirstOrDefaultAsync();
+        var energyStats = await _db.EnergyRecords
+            .AsNoTracking()
+            .Where(e => e.RecordDate >= monthStart && e.RecordDate <= today)
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                TodayEnergy = g.Where(e => e.RecordDate == today).Sum(e => (decimal?)e.EnergyKwh) ?? 0,
+                MonthEnergy = g.Sum(e => (decimal?)e.EnergyKwh) ?? 0
+            })
+            .FirstOrDefaultAsync();
+
+        var total = streetlightStats?.Total ?? 0;
+        var online = streetlightStats?.Online ?? 0;
+        var lightOn = streetlightStats?.LightOn ?? 0;
+        var fault = streetlightStats?.Fault ?? 0;
+        var unhandledAlarms = alarmStats?.Unhandled ?? 0;
+        var todayAlarms = alarmStats?.Today ?? 0;
+        var pendingOrders = workOrderStats?.Pending ?? 0;
+        var pendingReports = repairStats?.Pending ?? 0;
+        var todayEnergy = energyStats?.TodayEnergy ?? 0;
+        var monthEnergy = energyStats?.MonthEnergy ?? 0;
 
         return Ok(Result<object>.Success(new
         {
@@ -57,6 +101,7 @@ public class StatisticsController : ControllerBase
         var end = endDate != null ? DateOnly.Parse(endDate) : DateOnly.FromDateTime(DateTime.Today);
 
         var rows = await _db.EnergyRecords
+            .AsNoTracking()
             .Where(e => e.RecordDate >= start && e.RecordDate <= end)
             .GroupBy(e => e.RecordDate)
             .Select(g => new { recordDate = g.Key, energy = g.Sum(e => e.EnergyKwh) })
@@ -78,6 +123,7 @@ public class StatisticsController : ControllerBase
         var end = endDate != null ? DateOnly.Parse(endDate) : DateOnly.FromDateTime(DateTime.Today);
 
         var data = await _db.EnergyRecords
+            .AsNoTracking()
             .Where(e => e.RecordDate >= start && e.RecordDate <= end)
             .GroupBy(e => e.AreaId)
             .Select(g => new object[] { g.Key!, g.Sum(e => e.EnergyKwh) })
@@ -95,6 +141,7 @@ public class StatisticsController : ControllerBase
             { 5, "线缆异常" }, { 6, "温度异常" }, { 7, "漏电告警" }, { 8, "其他" }
         };
         var data = await _db.Alarms.Where(a => a.AlarmTime >= since)
+            .AsNoTracking()
             .GroupBy(a => a.Type)
             .Select(g => new { type = g.Key, count = g.Count() })
             .ToListAsync();
@@ -110,6 +157,7 @@ public class StatisticsController : ControllerBase
         var since = DateTime.Now.AddDays(-30);
         var levelNames = new Dictionary<int, string> { { 1, "低" }, { 2, "中" }, { 3, "高" }, { 4, "紧急" } };
         var data = await _db.Alarms.Where(a => a.AlarmTime >= since)
+            .AsNoTracking()
             .GroupBy(a => a.Level)
             .Select(g => new { level = g.Key, count = g.Count() })
             .ToListAsync();
@@ -122,7 +170,7 @@ public class StatisticsController : ControllerBase
     [HttpGet("device/by-type")]
     public async Task<IActionResult> DeviceByType()
     {
-        var data = await _db.Streetlights.GroupBy(s => s.LampType)
+        var data = await _db.Streetlights.AsNoTracking().GroupBy(s => s.LampType)
             .Select(g => new { lampType = g.Key, count = g.Count() }).ToListAsync();
         return Ok(Result<object>.Success(data));
     }
@@ -130,7 +178,7 @@ public class StatisticsController : ControllerBase
     [HttpGet("device/by-area")]
     public async Task<IActionResult> DeviceByArea()
     {
-        var data = await _db.Streetlights.GroupBy(s => s.AreaId)
+        var data = await _db.Streetlights.AsNoTracking().GroupBy(s => s.AreaId)
             .Select(g => new { areaId = g.Key, count = g.Count() }).ToListAsync();
         return Ok(Result<object>.Success(data));
     }

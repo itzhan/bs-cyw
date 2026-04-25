@@ -65,6 +65,16 @@ function formatDateTime(dateStr) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+function escapeHtml(value) {
+    if (value === null || value === undefined) return '';
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
 // ====== 状态标签工厂 ======
 const STATUS_MAP = {
     onlineStatus: { 0: { text: '离线', class: 'tag-default' }, 1: { text: '在线', class: 'tag-success' } },
@@ -170,6 +180,8 @@ function renderSidebar(activePage) {
         { icon: 'megaphone', text: '系统公告', href: '/pages/announcement.html', id: 'announcement' },
         { section: '系统管理', roles: ['ADMIN'] },
         { icon: 'users', text: '用户管理', href: '/pages/users.html', id: 'users', roles: ['ADMIN'] },
+        { icon: 'layers', text: '区域管理', href: '/pages/area.html', id: 'area', roles: ['ADMIN'] },
+        { icon: 'settings', text: '系统设置', href: '/pages/settings.html', id: 'settings', roles: ['ADMIN'] },
         { section: 'IoT通信', roles: ['ADMIN', 'OPERATOR'] },
         { icon: 'radio', text: 'MQTT通信', href: '/pages/mqtt.html', id: 'mqtt', roles: ['ADMIN', 'OPERATOR'] },
     ];

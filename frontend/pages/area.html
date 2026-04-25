@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>区域管理 - 城市智慧路灯管理系统</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+<div class="app-layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="main-content">
+        <header class="top-header" id="topHeader"></header>
+        <div class="page-content">
+            <h2 class="page-title">区域管理</h2>
+
+<div class="card">
+    <div class="card-header">
+        <h3>区域列表</h3>
+        <button class="btn btn-primary btn-sm" id="addBtn" onclick="openCreate()" style="display:none"><i data-lucide="plus" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:4px"></i>新增区域</button>
+    </div>
+    <div class="card-body">
+        <div class="search-bar">
+            <div class="search-input-wrapper"><span class="search-icon">🔍</span><input type="text" id="searchInput" placeholder="搜索区域名称/编码..." onkeyup="renderTable()"></div>
+            <select class="form-select" id="filterStatus" style="width:140px" onchange="renderTable()">
+                <option value="">全部状态</option>
+                <option value="1" selected>启用</option>
+                <option value="0">停用</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="loadAreas()">刷新</button>
+        </div>
+        <div class="table-container">
+            <table class="data-table">
+                <thead><tr>
+                    <th>编码</th><th>名称</th><th>父级</th><th>层级</th><th>排序</th><th>路灯数</th><th>电柜数</th><th>状态</th><th>描述</th><th>操作</th>
+                </tr></thead>
+                <tbody id="areaTableBody"><tr><td colspan="10"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 表单弹窗 -->
+<div class="modal-overlay" id="formModal">
+    <div class="modal" style="max-width:640px">
+        <div class="modal-header"><h3 id="formTitle">新增区域</h3><button class="modal-close" onclick="closeModal('formModal')">✕</button></div>
+        <div class="modal-body">
+            <div class="grid-2">
+                <div class="form-group"><label class="form-label">编码 *</label><input class="form-input" id="fCode" placeholder="区域编码，需唯一"></div>
+                <div class="form-group"><label class="form-label">名称 *</label><input class="form-input" id="fName" placeholder="区域名称"></div>
+                <div class="form-group"><label class="form-label">父级区域</label><select class="form-select" id="fParentId"><option value="0">-- 顶级区域 --</option></select></div>
+                <div class="form-group"><label class="form-label">层级</label><input class="form-input" id="fLevel" type="number" min="1" max="5" value="1"></div>
+                <div class="form-group"><label class="form-label">排序</label><input class="form-input" id="fSortOrder" type="number" value="0"></div>
+                <div class="form-group"><label class="form-label">状态</label><select class="form-select" id="fStatus"><option value="1">启用</option><option value="0">停用</option></select></div>
+            </div>
+            <div class="form-group"><label class="form-label">描述</label><textarea class="form-input" id="fDescription" rows="3" placeholder="区域描述（可选）"></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('formModal')">取消</button><button class="btn btn-primary" onclick="submitForm()">保存</button></div>
+    </div>
+</div>
+
+<!-- 删除确认 -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width:400px">
+        <div class="modal-header"><h3>确认删除</h3><button class="modal-close" onclick="closeModal('deleteModal')">✕</button></div>
+        <div class="modal-body">
+            <p>确定要删除区域 <strong id="deleteAreaName"></strong> 吗？</p>
+            <p style="color:var(--text-muted);font-size:13px;margin-top:8px">此操作不可恢复。若该区域下存在子区域、路灯或电柜，将无法删除。</p>
+        </div>
+        <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('deleteModal')">取消</button><button class="btn btn-danger" onclick="confirmDelete()">删除</button></div>
+    </div>
+</div>
+        </div>
+    </main>
+</div>
+<script src="../js/vendor/lucide.min.js"></script>
+<script src="../js/api.js?v=20260425b"></script>
+<script src="../js/utils.js?v=20260425b"></script>
+<script>if(!initPage('area','区域管理'))throw'';</script>
+<script>
+let editId = null;
+let deleteId = null;
+let allAreas = [];
+const isAdmin = hasRole('ADMIN');
+if (isAdmin) document.getElementById('addBtn').style.display = '';
+
+function areaNameById(id) {
+    if (!id || id == 0) return '-';
+    const a = allAreas.find(x => x.id == id);
+    return a ? a.name : '#' + id;
+}
+
+async function loadAreas() {
+    try {
+        const res = await areaApi.list({ includeAll: true, withCounts: true });
+        allAreas = res.data || [];
+        renderTable();
+        // Populate parent select
+        const opts = '<option value="0">-- 顶级区域 --</option>' +
+            allAreas.filter(a => !editId || a.id !== editId).map(a => `<option value="${a.id}">${escapeHtml(a.name)} (${escapeHtml(a.code)})</option>`).join('');
+        document.getElementById('fParentId').innerHTML = opts;
+    } catch(err) {
+        showToast('加载区域失败: ' + err.message, 'error');
+    }
+}
+
+function renderTable() {
+    const kw = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+    const statusFilter = document.getElementById('filterStatus').value;
+    let list = allAreas;
+    if (kw) list = list.filter(a => (a.name || '').toLowerCase().includes(kw) || (a.code || '').toLowerCase().includes(kw));
+    if (statusFilter !== '') list = list.filter(a => String(a.status) === statusFilter);
+
+    const tbody = document.getElementById('areaTableBody');
+    if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted">暂无数据</td></tr>';
+        return;
+    }
+    tbody.innerHTML = list.map(a => {
+        const statusHtml = a.status === 1
+            ? '<span class="tag tag-success">启用</span>'
+            : '<span class="tag tag-default">停用</span>';
+        let actions = '';
+        if (isAdmin) {
+            actions = `<button class="btn btn-outline btn-sm" onclick="openEdit(${a.id})">编辑</button>
+                       <button class="btn btn-danger btn-sm" onclick="openDelete(${a.id})">删除</button>`;
+        } else {
+            actions = '-';
+        }
+        return `<tr>
+            <td><code>${escapeHtml(a.code)}</code></td>
+            <td>${escapeHtml(a.name)}</td>
+            <td>${escapeHtml(areaNameById(a.parentId))}</td>
+            <td>${a.level || 1}</td>
+            <td>${a.sortOrder || 0}</td>
+            <td>${a.lightCount || 0}</td>
+            <td>${a.cabinetCount || 0}</td>
+            <td>${statusHtml}</td>
+            <td>${escapeHtml(a.description || '-')}</td>
+            <td style="white-space:nowrap">${actions}</td>
+        </tr>`;
+    }).join('');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function clearForm() {
+    document.getElementById('fCode').value = '';
+    document.getElementById('fName').value = '';
+    document.getElementById('fParentId').value = '0';
+    document.getElementById('fLevel').value = 1;
+    document.getElementById('fSortOrder').value = 0;
+    document.getElementById('fStatus').value = '1';
+    document.getElementById('fDescription').value = '';
+}
+
+function refreshParentOptions(excludeId) {
+    const sel = document.getElementById('fParentId');
+    const current = sel.value;
+    const opts = '<option value="0">-- 顶级区域 --</option>' +
+        allAreas.filter(a => !excludeId || a.id !== excludeId).map(a => `<option value="${a.id}">${escapeHtml(a.name)} (${escapeHtml(a.code)})</option>`).join('');
+    sel.innerHTML = opts;
+    sel.value = current;
+}
+
+function openCreate() {
+    editId = null;
+    clearForm();
+    refreshParentOptions(null);
+    document.getElementById('formTitle').textContent = '新增区域';
+    document.getElementById('fCode').readOnly = false;
+    document.getElementById('formModal').classList.add('show');
+}
+
+function openEdit(id) {
+    const a = allAreas.find(x => x.id == id);
+    if (!a) { showToast('区域不存在', 'error'); return; }
+    editId = id;
+    document.getElementById('formTitle').textContent = '编辑区域';
+    document.getElementById('fCode').value = a.code || '';
+    document.getElementById('fCode').readOnly = true; // code is unique identifier
+    document.getElementById('fName').value = a.name || '';
+    refreshParentOptions(id);
+    document.getElementById('fParentId').value = String(a.parentId || 0);
+    document.getElementById('fLevel').value = a.level || 1;
+    document.getElementById('fSortOrder').value = a.sortOrder || 0;
+    document.getElementById('fStatus').value = String(a.status);
+    document.getElementById('fDescription').value = a.description || '';
+    document.getElementById('formModal').classList.add('show');
+}
+
+async function submitForm() {
+    const code = document.getElementById('fCode').value.trim();
+    const name = document.getElementById('fName').value.trim();
+    if (!code || !name) { showToast('编码和名称为必填项', 'warning'); return; }
+    const data = {
+        code, name,
+        parentId: parseInt(document.getElementById('fParentId').value) || 0,
+        level: parseInt(document.getElementById('fLevel').value) || 1,
+        sortOrder: parseInt(document.getElementById('fSortOrder').value) || 0,
+        status: parseInt(document.getElementById('fStatus').value),
+        description: document.getElementById('fDescription').value.trim() || null
+    };
+    try {
+        if (editId) {
+            await areaApi.update(editId, data);
+            showToast('编辑成功', 'success');
+        } else {
+            await areaApi.create(data);
+            showToast('新增成功', 'success');
+        }
+        closeModal('formModal');
+        loadAreas();
+    } catch(err) {
+        showToast(err.message, 'error');
+    }
+}
+
+function openDelete(id) {
+    const a = allAreas.find(x => x.id == id);
+    if (!a) return;
+    deleteId = id;
+    document.getElementById('deleteAreaName').textContent = a.name + ' (' + a.code + ')';
+    document.getElementById('deleteModal').classList.add('show');
+}
+
+async function confirmDelete() {
+    try {
+        await areaApi.delete(deleteId);
+        showToast('删除成功', 'success');
+        closeModal('deleteModal');
+        loadAreas();
+    } catch(err) {
+        showToast(err.message, 'error');
+    }
+}
+
+loadAreas();
+</script>
+</body>
+</html>

@@ -45,9 +45,9 @@
         <div class="table-container">
             <table class="data-table">
                 <thead><tr>
-                    <th>编码</th><th>名称</th><th>灯型</th><th>功率(W)</th><th>在线</th><th>亮灯</th><th>设备状态</th><th>亮度</th><th>操作</th>
+                    <th>编码</th><th>名称</th><th>区域</th><th>电柜</th><th>灯型</th><th>功率(W)</th><th>在线</th><th>亮灯</th><th>设备状态</th><th>亮度</th><th>更新时间</th><th>操作</th>
                 </tr></thead>
-                <tbody id="deviceTableBody"><tr><td colspan="9"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
+                <tbody id="deviceTableBody"><tr><td colspan="12"><div class="loading"><div class="spinner"></div></div></td></tr></tbody>
             </table>
         </div>
         <div id="pagination"></div>
@@ -73,6 +73,7 @@
                 <div class="form-group"><label class="form-label">功率(W)</label><input class="form-input" id="fPower" type="number"></div>
                 <div class="form-group"><label class="form-label">高度(m)</label><input class="form-input" id="fHeight" type="number" step="0.01"></div>
                 <div class="form-group"><label class="form-label">所属区域 *</label><select class="form-select" id="fAreaId"></select></div>
+                <div class="form-group"><label class="form-label">所属电柜</label><select class="form-select" id="fCabinetId"></select></div>
                 <div class="form-group"><label class="form-label">经度</label><input class="form-input" id="fLongitude" type="number" step="0.0000001"></div>
                 <div class="form-group"><label class="form-label">纬度</label><input class="form-input" id="fLatitude" type="number" step="0.0000001"></div>
             </div>
@@ -93,8 +94,8 @@
     </main>
 </div>
 <script src="../js/vendor/lucide.min.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/utils.js"></script>
+<script src="../js/api.js?v=20260425b"></script>
+<script src="../js/utils.js?v=20260425b"></script>
 <script>if(!initPage('device','路灯设备'))throw'';</script>
 <script>
 let currentPage = 1;
@@ -135,17 +136,20 @@ async function loadDevices(page) {
             if (isAdmin || isOperator) actions += ` <button class="btn btn-outline btn-sm" onclick="openEdit(${s.id})">编辑</button>`;
             if (isAdmin) actions += ` <button class="btn btn-danger btn-sm" onclick="openDelete(${s.id})">删除</button>`;
             return `<tr>
-                <td><code>${s.code}</code></td>
-                <td>${s.name}</td>
-                <td>${s.lampType||'-'}</td>
+                <td><code>${escapeHtml(s.code)}</code></td>
+                <td>${escapeHtml(s.name)}</td>
+                <td>${escapeHtml(s.areaName || '-')}</td>
+                <td>${escapeHtml(s.cabinetName || '-')}</td>
+                <td>${escapeHtml(s.lampType || '-')}</td>
                 <td>${s.power||'-'}</td>
                 <td>${statusTag('onlineStatus',s.onlineStatus)}</td>
                 <td>${statusTag('lightStatus',s.lightStatus)}</td>
                 <td>${statusTag('deviceStatus',s.deviceStatus)}</td>
                 <td>${s.brightness}%</td>
+                <td>${formatDateTime(s.updatedAt)}</td>
                 <td style="white-space:nowrap">${actions}</td>
             </tr>`;
-        }).join('') || '<tr><td colspan="9" class="text-center text-muted">暂无数据</td></tr>';
+        }).join('') || '<tr><td colspan="12" class="text-center text-muted">暂无数据</td></tr>';
         renderPagination('pagination', d.total, d.page, d.size, loadDevices);
     } catch(err) { showToast(err.message,'error'); }
 }
@@ -158,12 +162,14 @@ async function showDetail(id) {
         const s = res.data;
         document.getElementById('detailContent').innerHTML = `
             <div class="grid-2">
-                <div class="form-group"><label class="form-label">编码</label><div>${s.code}</div></div>
-                <div class="form-group"><label class="form-label">名称</label><div>${s.name}</div></div>
-                <div class="form-group"><label class="form-label">灯型</label><div>${s.lampType||'-'}</div></div>
+                <div class="form-group"><label class="form-label">编码</label><div>${escapeHtml(s.code)}</div></div>
+                <div class="form-group"><label class="form-label">名称</label><div>${escapeHtml(s.name)}</div></div>
+                <div class="form-group"><label class="form-label">所属区域</label><div>${escapeHtml(s.areaName || '-')}</div></div>
+                <div class="form-group"><label class="form-label">所属电柜</label><div>${escapeHtml(s.cabinetName || '-')}</div></div>
+                <div class="form-group"><label class="form-label">灯型</label><div>${escapeHtml(s.lampType||'-')}</div></div>
                 <div class="form-group"><label class="form-label">功率</label><div>${s.power?s.power+'W':'-'}</div></div>
                 <div class="form-group"><label class="form-label">高度</label><div>${s.height?s.height+'m':'-'}</div></div>
-                <div class="form-group"><label class="form-label">地址</label><div>${s.address||'-'}</div></div>
+                <div class="form-group"><label class="form-label">地址</label><div>${escapeHtml(s.address||'-')}</div></div>
                 <div class="form-group"><label class="form-label">在线状态</label><div>${statusTag('onlineStatus',s.onlineStatus)}</div></div>
                 <div class="form-group"><label class="form-label">设备状态</label><div>${statusTag('deviceStatus',s.deviceStatus)}</div></div>
                 <div class="form-group"><label class="form-label">亮度</label><div>${s.brightness}%</div></div>
@@ -172,6 +178,7 @@ async function showDetail(id) {
                 <div class="form-group"><label class="form-label">温度</label><div>${s.temperature?s.temperature+'℃':'-'}</div></div>
                 <div class="form-group"><label class="form-label">运行时长</label><div>${s.runningHours?s.runningHours+'h':'-'}</div></div>
                 <div class="form-group"><label class="form-label">安装日期</label><div>${s.installDate||'-'}</div></div>
+                <div class="form-group"><label class="form-label">最后更新</label><div>${formatDateTime(s.updatedAt)}</div></div>
             </div>`;
         document.getElementById('detailModal').classList.add('show');
     } catch(err) { showToast(err.message,'error'); }
@@ -182,6 +189,7 @@ function clearForm() {
     ['fCode','fName','fDeviceUid','fPower','fHeight','fLongitude','fLatitude','fAddress'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('fLampType').value = 'LED';
     document.getElementById('fAreaId').value = '';
+    document.getElementById('fCabinetId').value = '';
 }
 function openForm() {
     editId = null;
@@ -204,6 +212,7 @@ async function openEdit(id) {
         document.getElementById('fPower').value = s.power || '';
         document.getElementById('fHeight').value = s.height || '';
         document.getElementById('fAreaId').value = s.areaId || '';
+        document.getElementById('fCabinetId').value = s.cabinetId || '';
         document.getElementById('fLongitude').value = s.longitude || '';
         document.getElementById('fLatitude').value = s.latitude || '';
         document.getElementById('fAddress').value = s.address || '';
@@ -214,6 +223,7 @@ async function submitForm() {
     const code = document.getElementById('fCode').value.trim();
     const name = document.getElementById('fName').value.trim();
     const areaId = document.getElementById('fAreaId').value;
+    const cabinetId = document.getElementById('fCabinetId').value;
     if (!code || !name) { showToast('编码和名称为必填项','warning'); return; }
     if (!areaId) { showToast('请选择所属区域','warning'); return; }
     const data = {
@@ -223,6 +233,7 @@ async function submitForm() {
         power: document.getElementById('fPower').value ? parseInt(document.getElementById('fPower').value) : null,
         height: document.getElementById('fHeight').value ? parseFloat(document.getElementById('fHeight').value) : null,
         areaId: parseInt(areaId),
+        cabinetId: cabinetId ? parseInt(cabinetId) : null,
         longitude: document.getElementById('fLongitude').value ? parseFloat(document.getElementById('fLongitude').value) : null,
         latitude: document.getElementById('fLatitude').value ? parseFloat(document.getElementById('fLatitude').value) : null,
         address: document.getElementById('fAddress').value.trim() || null

@@ -100,6 +100,47 @@
             height: 10px;
             border-radius: 50%;
         }
+        .edit-mode-banner {
+            display: none;
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+            background: rgba(239, 68, 68, 0.95);
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            box-shadow: 0 4px 12px rgba(239,68,68,0.3);
+        }
+        .edit-mode-banner.show { display: block; }
+        .btn-edit-active {
+            background: #EF4444 !important;
+            color: #fff !important;
+            border-color: #EF4444 !important;
+        }
+        .edit-pending-hint {
+            display: none;
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 21;
+            background: #F59E0B;
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            box-shadow: 0 4px 12px rgba(245,158,11,0.35);
+            pointer-events: none; /* 不挡地图点击 */
+        }
+        .edit-mode-banner { pointer-events: none; }
+        @keyframes pendingPulse {
+            0%,100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
     </style>
 </head>
 <body>
@@ -152,10 +193,13 @@
                             <option value="offline">离线</option>
                             <option value="maintain">维护中</option>
                         </select>
+                        <button class="btn btn-outline btn-sm" id="btnEditMode" onclick="toggleEditMode()" style="padding:6px 12px;font-size:12px;display:none"><i data-lucide="move" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:3px"></i>编辑坐标</button>
                         <button class="btn btn-outline btn-sm" onclick="refreshMapData()" style="padding:6px 12px;font-size:12px"><i data-lucide="refresh-cw" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:3px"></i>刷新数据</button>
                     </div>
                 </div>
-                <div class="card-body">
+                <div class="card-body" style="position:relative">
+                    <div id="editModeBanner" class="edit-mode-banner">🛠 编辑模式 · 点击路灯标记选中，再点地图新位置即可保存</div>
+                    <div id="editPendingHint" class="edit-pending-hint"></div>
                     <div id="mapContainer"></div>
                 </div>
             </div>
@@ -171,8 +215,8 @@
 </script>
 <script src="https://webapi.amap.com/maps?v=2.0&key=233f28b114cbe6fde30008428445f96f&plugin=AMap.Scale,AMap.ToolBar"></script>
 <script src="../js/vendor/lucide.min.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/utils.js"></script>
+<script src="../js/api.js?v=20260425b"></script>
+<script src="../js/utils.js?v=20260425b"></script>
 <script>if(!initPage('map','设备地图'))throw'';</script>
 <script>
 (function() {
@@ -181,6 +225,17 @@
     var markers = [];
     var allLights = [];
     var infoWindow = null;
+    var editMode = false;
+    var isAdmin = hasRole('ADMIN');
+    var pendingLight = null;     // 当前已选中、等待落点的路灯
+    var pendingMarker = null;    // 对应的 marker
+    var lastMarkerClickTime = 0; // 防 marker 点击立刻触发 map 点击
+
+    // Show edit-mode button only for admin
+    if (isAdmin) {
+        var btn = document.getElementById('btnEditMode');
+        if (btn) btn.style.display = '';
+    }
 
     // Color mapping for device status (0-5 per schema)
     var STATUS_COLORS = {
@@ -200,7 +255,7 @@
     function resolveColor(l){
         if (l.deviceStatus === 0) return '#EF4444';           // 故障优先红
         if (l.onlineStatus === 0) return '#94A3B8';           // 离线灰
-        if (l.lightStatus === 0) return '#94A3B8';            // 关灯 → 也视为灰(符合"策略关灯全灰"的可视要求)
+        if (l.lightStatus === 0) return '#94A3B8';            // 关灯 → 灰
         if (l.deviceStatus === 4 || l.deviceStatus === 2) return '#F59E0B'; // 维护/异常
         if (l.deviceStatus === 5) return '#94A3B8';
         return '#10B981';                                       // 亮灯+在线正常 = 绿
@@ -231,9 +286,124 @@
         '</div>';
     }
 
-    // Add markers to map using CircleMarker
+    // Robustly read {lng, lat} as numbers from an AMap LngLat (works whether lng/lat are
+    // properties, getter functions, or only available via getLng()/getLat()).
+    function readLngLat(e, m) {
+        var pos = (e && e.lnglat) || (m && m.getPosition && m.getPosition());
+        if (!pos) return null;
+        var lng = (typeof pos.getLng === 'function') ? pos.getLng()
+                : (typeof pos.lng === 'function') ? pos.lng()
+                : pos.lng;
+        var lat = (typeof pos.getLat === 'function') ? pos.getLat()
+                : (typeof pos.lat === 'function') ? pos.lat()
+                : pos.lat;
+        lng = Number(lng); lat = Number(lat);
+        if (!isFinite(lng) || !isFinite(lat)) return null;
+        return { lng: Number(lng.toFixed(7)), lat: Number(lat.toFixed(7)) };
+    }
+
+    // Build HTML content for an edit-mode marker (selected = highlighted ring + scale)
+    function buildMarkerHtml(color, isLit, selected) {
+        var size = isLit ? 22 : 18;
+        if (selected) size += 8;
+        var opacity = selected ? 1 : (isLit ? 0.9 : 0.6);
+        var ring = selected ? 'box-shadow:0 0 0 4px rgba(245,158,11,0.5),0 4px 12px rgba(0,0,0,0.5);' : 'box-shadow:0 2px 6px rgba(0,0,0,0.4);';
+        var border = selected ? '3px solid #F59E0B' : '2px solid #fff';
+        return '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;'
+             + 'background:' + color + ';opacity:' + opacity + ';'
+             + 'border:' + border + ';' + ring
+             + 'cursor:pointer;pointer-events:auto;'
+             + (selected ? 'animation:pendingPulse 1.2s ease-in-out infinite;' : '')
+             + '"></div>';
+    }
+
+    // Direct fetch — 不依赖 lightApi(避免 api.js 旧版缓存导致 updateLocation 不存在)
+    function callUpdateLocation(id, lng, lat) {
+        var token = localStorage.getItem('token');
+        var apiBase = location.port === '3000' ? 'http://localhost:8080/api' : '/api';
+        return fetch(apiBase + '/streetlights/' + id + '/location', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': token ? 'Bearer ' + token : ''
+            },
+            body: JSON.stringify({ longitude: lng, latitude: lat })
+        }).then(function(r) {
+            if (r.status === 401) throw new Error('登录已过期');
+            return r.json();
+        }).then(function(d) {
+            if (d.code !== 200) throw new Error(d.message || '保存失败');
+            return d;
+        });
+    }
+
+    // Save the pending light to a new lng/lat
+    function savePendingLocation(lng, lat) {
+        if (!pendingLight) return;
+        var l = pendingLight;
+        console.log('[Map] saving', l.id, lng, lat);
+        var prevLng = l.longitude, prevLat = l.latitude;
+        if (pendingMarker && pendingMarker.setPosition) {
+            try { pendingMarker.setPosition(new AMap.LngLat(lng, lat)); } catch(_){}
+        }
+        callUpdateLocation(l.id, lng, lat).then(function() {
+            showToast('已保存: ' + l.name + ' (' + lng + ', ' + lat + ')', 'success', 2500);
+            l.longitude = lng;
+            l.latitude = lat;
+            var src = allLights.find(function(a){ return a.id === l.id; });
+            if (src) { src.longitude = lng; src.latitude = lat; }
+            clearPending();
+        }).catch(function(err) {
+            console.error('[Map] save failed', err);
+            showToast('保存失败: ' + err.message, 'error');
+            if (pendingMarker && pendingMarker.setPosition) {
+                try { pendingMarker.setPosition(new AMap.LngLat(Number(prevLng), Number(prevLat))); } catch(_){}
+            }
+        });
+    }
+
+    // 原地更新某个 marker 的视觉(选中/未选中),不全量重建,这样事件链不会被打断
+    function paintMarker(marker, light, selected) {
+        if (!marker || !marker.setContent) return;
+        try {
+            var color = resolveColor(light);
+            var lit = light.lightStatus === 1 && light.onlineStatus === 1;
+            marker.setContent(buildMarkerHtml(color, lit, selected));
+            if (marker.setzIndex) marker.setzIndex(selected ? 100 : (light.deviceStatus === 0 ? 20 : 10));
+            // 更新 offset 因为选中状态尺寸不同
+            var baseSize = lit ? 22 : 18;
+            var totalSize = selected ? baseSize + 8 + 6 : baseSize + 4;
+            if (marker.setOffset) marker.setOffset(new AMap.Pixel(-totalSize/2, -totalSize/2));
+        } catch (err) { console.warn('[Map] paintMarker failed', err); }
+    }
+
+    function clearPending() {
+        if (pendingMarker && pendingLight) {
+            paintMarker(pendingMarker, pendingLight, false);
+        }
+        pendingLight = null;
+        pendingMarker = null;
+        var hint = document.getElementById('editPendingHint');
+        if (hint) hint.style.display = 'none';
+    }
+
+    function selectPending(light, marker) {
+        // 取消之前选中的(原地刷视觉)
+        if (pendingMarker && pendingLight && pendingLight.id !== light.id) {
+            paintMarker(pendingMarker, pendingLight, false);
+        }
+        pendingLight = light;
+        pendingMarker = marker;
+        paintMarker(marker, light, true);
+        var hint = document.getElementById('editPendingHint');
+        if (hint) {
+            hint.innerHTML = '✓ 已选中 <strong>' + light.name + '</strong>，请在地图上点击新位置（再点该标记取消）';
+            hint.style.display = 'block';
+        }
+    }
+
+    // Add markers to map (CircleMarker for view mode, Marker for edit mode)
     function addMarkers(lights) {
-        // Clear existing markers
         if (markers.length) {
             map.remove(markers);
             markers = [];
@@ -244,37 +414,106 @@
             if (!light.longitude || !light.latitude) continue;
 
             var color = resolveColor(light);
-
             var isLit = light.lightStatus === 1 && light.onlineStatus === 1;
-            var radius = isLit ? 10 : 7;
+            var position = new AMap.LngLat(Number(light.longitude), Number(light.latitude));
+            var marker;
 
-            var circleMarker = new AMap.CircleMarker({
-                center: new AMap.LngLat(Number(light.longitude), Number(light.latitude)),
-                radius: radius,
-                strokeColor: color,
-                strokeWeight: 2,
-                strokeOpacity: 0.8,
-                fillColor: color,
-                fillOpacity: isLit ? 0.6 : 0.4,
-                zIndex: light.deviceStatus === 0 ? 20 : 10,
-                cursor: 'pointer',
-                bubble: false
-            });
-
-            // Use closure to capture light
-            (function(l, cm) {
-                cm.on('click', function() {
-                    infoWindow.setContent(buildInfoContent(l));
-                    infoWindow.open(map, new AMap.LngLat(Number(l.longitude), Number(l.latitude)));
+            if (editMode) {
+                var isSelected = pendingLight && pendingLight.id === light.id;
+                var baseSize = isLit ? 22 : 18;
+                var totalSize = isSelected ? baseSize + 8 + 6 : baseSize + 4; // +border
+                marker = new AMap.Marker({
+                    position: position,
+                    content: buildMarkerHtml(color, isLit, isSelected),
+                    offset: new AMap.Pixel(-totalSize/2, -totalSize/2),
+                    draggable: true, // 留着试试,不行就用点选
+                    cursor: 'pointer',
+                    zIndex: isSelected ? 100 : (light.deviceStatus === 0 ? 20 : 10),
+                    bubble: false
                 });
-            })(light, circleMarker);
 
-            markers.push(circleMarker);
+                (function(l, m) {
+                    // Drag fallback (works on some SDK builds)
+                    m.on('dragend', function(e) {
+                        console.log('[Map] dragend fired for', l.code || l.id);
+                        var p = readLngLat(e, m);
+                        if (!p) {
+                            console.error('[Map] dragend: cannot read position', e, m.getPosition && m.getPosition());
+                            return;
+                        }
+                        // route through the same save path
+                        pendingLight = l; pendingMarker = m;
+                        savePendingLocation(p.lng, p.lat);
+                    });
+                    // Primary mechanism: click-to-select then click-map-to-place
+                    m.on('click', function(e) {
+                        lastMarkerClickTime = Date.now();
+                        if (pendingLight && pendingLight.id === l.id) {
+                            // 二次点击同一目标 = 取消
+                            console.log('[Map] cancel pending', l.id);
+                            clearPending();
+                            return;
+                        }
+                        console.log('[Map] select pending', l.id);
+                        selectPending(l, m);
+                    });
+                })(light, marker);
+            } else {
+                var radius = isLit ? 10 : 7;
+                marker = new AMap.CircleMarker({
+                    center: position,
+                    radius: radius,
+                    strokeColor: color,
+                    strokeWeight: 2,
+                    strokeOpacity: 0.8,
+                    fillColor: color,
+                    fillOpacity: isLit ? 0.6 : 0.4,
+                    zIndex: light.deviceStatus === 0 ? 20 : 10,
+                    cursor: 'pointer',
+                    bubble: false
+                });
+
+                (function(l, cm) {
+                    cm.on('click', function() {
+                        infoWindow.setContent(buildInfoContent(l));
+                        infoWindow.open(map, new AMap.LngLat(Number(l.longitude), Number(l.latitude)));
+                    });
+                })(light, marker);
+            }
+
+            markers.push(marker);
         }
 
         map.add(markers);
-        console.log('[Map] Added ' + markers.length + ' circle markers');
+        console.log('[Map] Added ' + markers.length + ' markers (editMode=' + editMode + ')');
     }
+
+    // Toggle edit mode (admin only)
+    window.toggleEditMode = function() {
+        if (!isAdmin) return;
+        editMode = !editMode;
+        // Close any open info window so it can't intercept drag events
+        if (infoWindow && infoWindow.close) { try { infoWindow.close(); } catch(_){} }
+        var btn = document.getElementById('btnEditMode');
+        var banner = document.getElementById('editModeBanner');
+        if (editMode) {
+            btn.classList.add('btn-edit-active');
+            btn.innerHTML = '<i data-lucide="check" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:3px"></i>退出编辑';
+            banner.classList.add('show');
+            banner.innerHTML = '🛠 编辑模式 · 点击路灯标记选中，再点地图新位置即可保存（也可尝试直接拖拽）';
+            showToast('已进入编辑模式：先点路灯，再点新位置', 'info', 3000);
+        } else {
+            pendingLight = null; pendingMarker = null;
+            var hint = document.getElementById('editPendingHint');
+            if (hint) hint.style.display = 'none';
+            btn.classList.remove('btn-edit-active');
+            btn.innerHTML = '<i data-lucide="move" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:3px"></i>编辑坐标';
+            banner.classList.remove('show');
+        }
+        if (window.lucide) lucide.createIcons();
+        // Re-render markers with new mode
+        filterMarkers();
+    };
 
     // Filter markers
     window.filterMarkers = function() {
@@ -287,7 +526,6 @@
         else if (filter === 'maintain') filtered = allLights.filter(function(l) { return l.deviceStatus === 4 || l.deviceStatus === 2; });
 
         addMarkers(filtered);
-        if (markers.length > 0) map.setFitView(markers, false, [60, 60, 60, 60]);
     };
 
     // Update statistics
@@ -313,7 +551,7 @@
             updateStats(allLights);
             addMarkers(allLights);
 
-            if (markers.length > 0) {
+            if (markers.length > 0 && !editMode) {
                 map.setFitView(markers, false, [60, 60, 60, 60]);
             }
         }).catch(function(err) {
@@ -342,6 +580,40 @@
 
     map.addControl(new AMap.Scale());
     map.addControl(new AMap.ToolBar({ position: 'RT' }));
+
+    // Map-click handler: in edit mode with a pending selection, treat the click
+    // as the new position. AMap fires this on the map itself (not on markers, since
+    // markers have bubble:false).
+    map.on('click', function(e) {
+        var dt = Date.now() - lastMarkerClickTime;
+        console.log('[Map] map click fired, editMode=', editMode, 'pending=', pendingLight && pendingLight.id, 'dt=', dt);
+        if (!editMode) return;
+        if (!pendingLight) {
+            // 编辑模式下点空白,提示用户先选路灯
+            return;
+        }
+        // 用一个非常短的去抖防 marker click 同事件冒泡(理论 bubble:false 应避免,但稳一点没坏处)
+        if (dt < 80) {
+            console.log('[Map] map click skipped (within ' + dt + 'ms of marker click)');
+            return;
+        }
+        var p = readLngLat(e, null);
+        if (!p) {
+            console.error('[Map] map click: cannot read lnglat', e);
+            showToast('无法读取点击位置, 请打开 Console 查看', 'error');
+            return;
+        }
+        console.log('[Map] map click @', p.lng, p.lat, 'for pending', pendingLight.id);
+        savePendingLocation(p.lng, p.lat);
+    });
+
+    // ESC key cancels pending selection
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && pendingLight) {
+            clearPending();
+            showToast('已取消选中', 'info', 1500);
+        }
+    });
 
     // Expose refresh for the toolbar button
     window.refreshMapData = function() {

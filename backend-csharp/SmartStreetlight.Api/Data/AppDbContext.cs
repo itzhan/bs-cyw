@@ -21,6 +21,7 @@ public class AppDbContext : DbContext
     public DbSet<RepairReport> RepairReports => Set<RepairReport>();
     public DbSet<Announcement> Announcements => Set<Announcement>();
     public DbSet<MqttMessage> MqttMessages => Set<MqttMessage>();
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -72,6 +73,15 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Alarm>().HasIndex(a => a.AlarmCode).IsUnique();
         modelBuilder.Entity<WorkOrder>().HasIndex(w => w.OrderNo).IsUnique();
         modelBuilder.Entity<RepairReport>().HasIndex(r => r.ReportNo).IsUnique();
+        modelBuilder.Entity<EnergyRecord>().HasIndex(e => new { e.StreetlightId, e.RecordDate }).IsUnique();
+        modelBuilder.Entity<EnergyRecord>().HasIndex(e => new { e.RecordDate, e.AreaId });
+        modelBuilder.Entity<ControlStrategy>().HasIndex(c => new { c.Status, c.LastPhase, c.StartDatetime });
+        modelBuilder.Entity<ControlStrategy>().HasIndex(c => new { c.Status, c.LastPhase, c.EndDatetime });
+        modelBuilder.Entity<MqttMessage>().HasIndex(m => new { m.DeviceUid, m.Direction, m.CreatedAt });
+        modelBuilder.Entity<Announcement>().HasIndex(a => new { a.Status, a.TopFlag, a.PublishTime });
+        modelBuilder.Entity<WorkOrder>().HasIndex(w => new { w.Status, w.AreaId, w.CreatedAt });
+        modelBuilder.Entity<RepairReport>().HasIndex(r => new { r.Status, r.ReporterId, r.CreatedAt });
+        modelBuilder.Entity<SystemSetting>().HasIndex(s => s.Key).IsUnique();
     }
 
     public override int SaveChanges()

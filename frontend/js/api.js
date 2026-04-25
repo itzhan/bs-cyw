@@ -106,14 +106,25 @@ const lightApi = {
     detail: (id) => api.get(`/streetlights/${id}`),
     create: (data) => api.post('/streetlights', data),
     update: (id, data) => api.put(`/streetlights/${id}`, data),
+    updateLocation: (id, data) => api.put(`/streetlights/${id}/location`, data),
     delete: (id) => api.delete(`/streetlights/${id}`),
 };
 
 // ====== Area API ======
 const areaApi = {
-    list: () => api.get('/areas'),
+    list: (params) => api.get('/areas', params),
     tree: () => api.get('/areas/tree'),
     children: (parentId) => api.get(`/areas/children/${parentId}`),
+    create: (data) => api.post('/areas', data),
+    update: (id, data) => api.put(`/areas/${id}`, data),
+    delete: (id) => api.delete(`/areas/${id}`),
+};
+
+// ====== System Settings API ======
+const settingsApi = {
+    list: () => api.get('/settings'),
+    get: (key) => api.get(`/settings/${key}`),
+    update: (key, data) => api.put(`/settings/${key}`, data),
 };
 
 // ====== Cabinet API ======

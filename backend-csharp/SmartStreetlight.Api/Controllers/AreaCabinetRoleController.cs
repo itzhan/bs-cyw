@@ -15,8 +15,23 @@ public class AreaController : ControllerBase
     public AreaController(AppDbContext db) => _db = db;
 
     [HttpGet]
-    public async Task<IActionResult> List()
-        => Ok(Result<object>.Success(await _db.Areas.Where(a => a.Status == 1).OrderBy(a => a.SortOrder).ToListAsync()));
+    public async Task<IActionResult> List(bool includeAll = false, bool withCounts = false)
+    {
+        var query = _db.Areas.AsQueryable();
+        if (!includeAll) query = query.Where(a => a.Status == 1);
+        var areas = await query.OrderBy(a => a.SortOrder).ThenBy(a => a.Id).ToListAsync();
+        if (!withCounts)
+            return Ok(Result<object>.Success(areas));
+
+        var lightCounts = await _db.Streetlights.GroupBy(s => s.AreaId).Select(g => new { AreaId = g.Key, Cnt = g.Count() }).ToDictionaryAsync(x => x.AreaId, x => x.Cnt);
+        var cabinetCounts = await _db.Cabinets.GroupBy(c => c.AreaId).Select(g => new { AreaId = g.Key, Cnt = g.Count() }).ToDictionaryAsync(x => x.AreaId, x => x.Cnt);
+        var result = areas.Select(a => new {
+            a.Id, a.Name, a.Code, a.ParentId, a.Level, a.Description, a.SortOrder, a.Status,
+            LightCount = lightCounts.TryGetValue(a.Id, out var lc) ? lc : 0,
+            CabinetCount = cabinetCounts.TryGetValue(a.Id, out var cc) ? cc : 0
+        }).ToList();
+        return Ok(Result<object>.Success(result));
+    }
 
     [HttpGet("tree")]
     public async Task<IActionResult> Tree()
@@ -49,7 +64,9 @@ public class AreaController : ControllerBase
         if (entity == null) return Ok(Result.Error(404, "区域不存在"));
         if (dto.Name != null) entity.Name = dto.Name;
         if (dto.Description != null) entity.Description = dto.Description;
-        if (dto.SortOrder != 0) entity.SortOrder = dto.SortOrder;
+        entity.SortOrder = dto.SortOrder;
+        entity.ParentId = dto.ParentId;
+        if (dto.Level != 0) entity.Level = dto.Level;
         entity.Status = dto.Status;
         await _db.SaveChangesAsync();
         return Ok(Result.Success());
@@ -61,6 +78,10 @@ public class AreaController : ControllerBase
     {
         if (await _db.Areas.AnyAsync(a => a.ParentId == id))
             return Ok(Result.Error(400, "该区域下存在子区域，无法删除"));
+        if (await _db.Streetlights.AnyAsync(s => s.AreaId == id))
+            return Ok(Result.Error(400, "该区域下存在路灯，无法删除"));
+        if (await _db.Cabinets.AnyAsync(c => c.AreaId == id))
+            return Ok(Result.Error(400, "该区域下存在电柜，无法删除"));
         var entity = await _db.Areas.FindAsync(id);
         if (entity != null) _db.Areas.Remove(entity);
         await _db.SaveChangesAsync();

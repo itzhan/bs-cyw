@@ -50,10 +50,53 @@
 </div>
 
 <script src="../js/vendor/lucide.min.js"></script>
-<script src="../js/api.js"></script>
-<script src="../js/utils.js"></script>
+<script src="../js/api.js?v=20260425b"></script>
+<script src="../js/utils.js?v=20260425b"></script>
 <script>
     if (!initPage('dashboard', '仪表盘')) throw '';
+    const dashboardState = {
+        charts: {},
+        timers: [],
+        initialized: false
+    };
+
+    function getChart(key, elementId) {
+        if (!dashboardState.charts[key]) {
+            dashboardState.charts[key] = echarts.init(document.getElementById(elementId));
+        }
+        return dashboardState.charts[key];
+    }
+
+    function scheduleDashboardRefresh() {
+        clearDashboardTimers();
+        if (document.hidden) return;
+        dashboardState.timers.push(setInterval(loadOverview, 15000));
+        dashboardState.timers.push(setInterval(loadAlarmChart, 60000));
+        dashboardState.timers.push(setInterval(loadEnergyChart, 60000));
+    }
+
+    function clearDashboardTimers() {
+        dashboardState.timers.forEach(clearInterval);
+        dashboardState.timers = [];
+    }
+
+    function renderAnnouncements(list) {
+        const container = document.getElementById('announceList');
+        if (!list.length) {
+            container.innerHTML = '<div class="empty-state"><p>暂无公告</p></div>';
+            return;
+        }
+
+        container.innerHTML = list.map(a => `
+            <div style="padding:12px 0;border-bottom:1px solid var(--border-light);cursor:pointer" onclick="location.href='announcement.html?id=${a.id}'">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                    ${a.topFlag === 1 ? '<span class="tag tag-danger" style="font-size:10px">置顶</span>' : ''}
+                    <span style="font-size:13px;font-weight:500">${escapeHtml(a.title)}</span>
+                </div>
+                <span style="font-size:12px;color:var(--text-muted)">${formatDateTime(a.publishTime)}</span>
+            </div>
+        `).join('');
+    }
 
     // 加载总览数据
     async function loadOverview() {
@@ -119,7 +162,7 @@
     async function loadEnergyChart() {
         try {
             const res = await statsApi.energyDaily();
-            const chart = echarts.init(document.getElementById('energyChart'));
+            const chart = getChart('energy', 'energyChart');
             chart.setOption({
                 tooltip: { trigger: 'axis', formatter: '{b}<br/>能耗: {c} kWh' },
                 grid: { left: 50, right: 20, top: 20, bottom: 30 },
@@ -151,8 +194,7 @@
                     symbol: 'circle',
                     symbolSize: 6
                 }]
-            });
-            window.addEventListener('resize', () => chart.resize());
+            }, true);
         } catch (err) { console.error('能耗图表加载失败', err); }
     }
 
@@ -160,7 +202,7 @@
     async function loadAlarmChart() {
         try {
             const res = await statsApi.alarmByType();
-            const chart = echarts.init(document.getElementById('alarmChart'));
+            const chart = getChart('alarm', 'alarmChart');
             const colors = ['#EF4444', '#F59E0B', '#3B82F6', '#8B5CF6', '#10B981', '#6B7280'];
             chart.setOption({
                 tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
@@ -175,8 +217,7 @@
                     emphasis: { label: { show: true, fontSize: 14, fontWeight: 'bold' } },
                     data: res.data.map(d => ({ name: d.typeName, value: d.count }))
                 }]
-            });
-            window.addEventListener('resize', () => chart.resize());
+            }, true);
         } catch (err) { console.error('告警图表加载失败', err); }
     }
 
@@ -184,7 +225,7 @@
     async function loadDeviceChart() {
         try {
             const res = await statsApi.deviceByType();
-            const chart = echarts.init(document.getElementById('deviceChart'));
+            const chart = getChart('device', 'deviceChart');
             chart.setOption({
                 tooltip: { trigger: 'axis' },
                 grid: { left: 60, right: 20, top: 20, bottom: 30 },
@@ -212,8 +253,7 @@
                         ])
                     }
                 }]
-            });
-            window.addEventListener('resize', () => chart.resize());
+            }, true);
         } catch (err) { console.error('设备图表加载失败', err); }
     }
 
@@ -222,35 +262,33 @@
         try {
             const res = await announceApi.published();
             const list = res.data.slice(0, 5);
-            if (list.length === 0) {
-                document.getElementById('announceList').innerHTML = '<div class="empty-state"><p>暂无公告</p></div>';
-                return;
-            }
-            document.getElementById('announceList').innerHTML = list.map(a => `
-                <div style="padding:12px 0;border-bottom:1px solid var(--border-light);cursor:pointer" onclick="location.href='announcement.html?id=${a.id}'">
-                    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-                        ${a.topFlag === 1 ? '<span class="tag tag-danger" style="font-size:10px">置顶</span>' : ''}
-                        <span style="font-size:13px;font-weight:500">${a.title}</span>
-                    </div>
-                    <span style="font-size:12px;color:var(--text-muted)">${formatDateTime(a.publishTime)}</span>
-                </div>
-            `).join('');
+            renderAnnouncements(list);
         } catch (err) { console.error('公告加载失败', err); }
     }
 
-    // 初始化
-    loadOverview();
-    loadEnergyChart();
-    loadAlarmChart();
-    loadDeviceChart();
-    loadAnnouncements();
+    async function initializeDashboard() {
+        if (dashboardState.initialized) return;
+        dashboardState.initialized = true;
+        await Promise.all([
+            loadOverview(),
+            loadEnergyChart(),
+            loadAlarmChart(),
+            loadDeviceChart(),
+            loadAnnouncements()
+        ]);
+        scheduleDashboardRefresh();
+    }
 
-    // 每 15 秒轮询刷新统计卡片(实现工单/报修/告警实时联动)
-    setInterval(loadOverview, 15000);
-    // 每 60 秒刷新告警饼图(匹配告警中心新建/批处理)
-    setInterval(loadAlarmChart, 60000);
-    // 每 60 秒刷新能耗(匹配能耗累计服务)
-    setInterval(loadEnergyChart, 60000);
+    window.addEventListener('resize', () => {
+        Object.values(dashboardState.charts).forEach(chart => chart.resize());
+    });
+    document.addEventListener('visibilitychange', scheduleDashboardRefresh);
+    window.addEventListener('beforeunload', () => {
+        clearDashboardTimers();
+        Object.values(dashboardState.charts).forEach(chart => chart.dispose());
+    });
+
+    initializeDashboard();
 </script>
 </body>
 </html>

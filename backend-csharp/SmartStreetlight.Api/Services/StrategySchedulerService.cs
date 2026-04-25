@@ -39,25 +39,26 @@ public class StrategySchedulerService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = DateTime.Now;
-
-        var strategies = await db.ControlStrategies
-            .Where(s => s.Status == 1 && (s.StartDatetime != null || s.EndDatetime != null))
+        var dueStarts = await db.ControlStrategies
+            .Where(s => s.Status == 1 && s.LastPhase == 0 && s.StartDatetime.HasValue && s.StartDatetime <= now)
+            .OrderByDescending(s => s.Priority)
+            .ThenBy(s => s.StartDatetime)
             .ToListAsync();
-
-        foreach (var s in strategies)
+        foreach (var s in dueStarts)
         {
-            // 开始: last_phase=0 且 now >= start_datetime
-            if (s.LastPhase == 0 && s.StartDatetime.HasValue && now >= s.StartDatetime.Value)
-            {
-                await ApplyActionAsync(db, s, isEnd: false);
-                s.LastPhase = 1;
-            }
-            // 结束: last_phase=1 且 now >= end_datetime
-            if (s.LastPhase == 1 && s.EndDatetime.HasValue && now >= s.EndDatetime.Value)
-            {
-                await ApplyActionAsync(db, s, isEnd: true);
-                s.LastPhase = 2;
-            }
+            await ApplyActionAsync(db, s, isEnd: false);
+            s.LastPhase = 1;
+        }
+
+        var dueEnds = await db.ControlStrategies
+            .Where(s => s.Status == 1 && s.LastPhase == 1 && s.EndDatetime.HasValue && s.EndDatetime <= now)
+            .OrderByDescending(s => s.Priority)
+            .ThenBy(s => s.EndDatetime)
+            .ToListAsync();
+        foreach (var s in dueEnds)
+        {
+            await ApplyActionAsync(db, s, isEnd: true);
+            s.LastPhase = 2;
         }
 
         await db.SaveChangesAsync();
@@ -84,6 +85,7 @@ public class StrategySchedulerService : BackgroundService
             turnOff = brightness == 0;
         }
 
+        var mqttTasks = new List<Task>();
         foreach (var l in lights)
         {
             if (turnOff)
@@ -107,7 +109,7 @@ public class StrategySchedulerService : BackgroundService
                     var payload = turnOff
                         ? "{\"action\":\"TURN_OFF\"}"
                         : $"{{\"action\":\"SET_BRIGHTNESS\",\"brightness\":{brightness}}}";
-                    _ = _mqtt.SendCommandAsync(l.DeviceUid!, turnOff ? "TURN_OFF" : "SET_BRIGHTNESS", payload);
+                    mqttTasks.Add(_mqtt.SendCommandAsync(l.DeviceUid!, turnOff ? "TURN_OFF" : "SET_BRIGHTNESS", payload));
                 }
                 catch { /* ignore mqtt errors */ }
             }
@@ -125,5 +127,17 @@ public class StrategySchedulerService : BackgroundService
 
         _logger.LogInformation("[StrategyScheduler] strategy {Id} {Phase}: {Count} lights {Action}",
             s.Id, isEnd ? "end" : "start", lights.Count, turnOff ? "OFF" : "ON");
+
+        if (mqttTasks.Count > 0)
+        {
+            try
+            {
+                await Task.WhenAll(mqttTasks);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("[StrategyScheduler] MQTT sync failed: {Msg}", ex.Message);
+            }
+        }
     }
 }

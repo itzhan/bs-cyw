@@ -211,7 +211,10 @@ async function confirmDelete(){
     catch(err){ showToast(err.message,'error'); }
 }
 
-loadList();
+loadList().then(() => {
+    const urlId = new URLSearchParams(location.search).get('id');
+    if (urlId) showDetail(parseInt(urlId));
+});
 </script>
 </body>
 </html>

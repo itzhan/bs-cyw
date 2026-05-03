@@ -24,8 +24,3 @@ CALL add_col_if_missing('control_strategy', 'last_phase',     "last_phase TINYIN
 CALL add_col_if_missing('work_order',       'repair_report_id', "repair_report_id BIGINT COMMENT '关联报修ID'");
 
 DROP PROCEDURE add_col_if_missing;
-
--- 清理可能爆炸的历史告警(绕开外键)
-SET FOREIGN_KEY_CHECKS=0;
-DELETE FROM alarm;
-SET FOREIGN_KEY_CHECKS=1;
